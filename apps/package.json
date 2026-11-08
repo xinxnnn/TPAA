@@ -1,0 +1,31 @@
+{
+  "name": "@tpaa/frontend",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "user-web",
+    "tp-web",
+    "ap-web",
+    "ops-web"
+  ],
+  "scripts": {
+    "dev:user": "npm --workspace @tpaa/user-web run dev",
+    "dev:tp": "npm --workspace @tpaa/tp-web run dev",
+    "dev:ap": "npm --workspace @tpaa/ap-web run dev",
+    "dev:ops": "npm --workspace @tpaa/ops-web run dev",
+    "typecheck": "npm --workspaces --if-present run typecheck",
+    "boundary": "python ../scripts/check_frontend_boundary.py"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.9"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  }
+}

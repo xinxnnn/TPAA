@@ -1,0 +1,90 @@
+<title>TPAA AG2 集成蓝图</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: a restrained technical dossier with a persistent navigation rail and numbered protocol spine. */
+:root{--bg:#f2f5f4;--paper:#fff;--ink:#19312e;--muted:#576d68;--line:#cfdbd6;--accent:#086b5e;--soft:#e5f2ed;--warn:#865d16;--warn-bg:#fff3dc;--bad:#9a433d;--bad-bg:#fae9e6;--code:#eaf0ee;--display:Georgia,"Noto Serif SC",serif;--body:"Noto Sans SC","Microsoft YaHei",sans-serif;--mono:Consolas,"Cascadia Code",monospace;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#152321;--paper:#1e302c;--ink:#e8f3ee;--muted:#adcbc1;--line:#37544b;--accent:#78c9ab;--soft:#253e35;--warn:#f6cb78;--warn-bg:#403524;--bad:#efaba2;--bad-bg:#442c2b;--code:#233b34;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#152321;--paper:#1e302c;--ink:#e8f3ee;--muted:#adcbc1;--line:#37544b;--accent:#78c9ab;--soft:#253e35;--warn:#f6cb78;--warn-bg:#403524;--bad:#efaba2;--bad-bg:#442c2b;--code:#233b34;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:22px 80px;line-height:1.7}main{max-width:1220px;margin:auto;display:grid;grid-template-columns:205px minmax(0,1fr);gap:32px}.rail{position:sticky;top:28px;align-self:start;font-size:12px;padding-top:16px}.rail .eyebrow{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.1em}.rail a{display:block;padding:8px 9px;text-decoration:none;color:var(--muted);border-left:2px solid var(--line)}.rail a:hover,.rail a:focus{color:var(--accent);border-color:var(--accent)}.sheet{min-width:0;background:var(--paper);border:1px solid var(--line);padding:36px clamp(20px,4vw,58px);box-shadow:0 12px 40px rgba(16,42,33,.05)}h1,h2,h3{line-height:1.35;text-wrap:balance}h1{font:600 clamp(28px,4vw,42px)/1.28 var(--display);margin:10px 0 12px}h2{font-size:21px;margin:44px 0 16px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:15px;margin:24px 0 8px}.lead{font-size:16px;color:var(--muted);max-width:740px}.kicker{font:700 11px var(--mono);letter-spacing:.12em;color:var(--accent)}.meta{font-size:12px;color:var(--muted);margin-bottom:25px}.callout{border-left:4px solid var(--accent);background:var(--soft);padding:13px 17px;margin:22px 0}.warn{border-color:var(--warn);background:var(--warn-bg)}.danger{border-color:var(--bad);background:var(--bad-bg)}.callout strong{display:block;margin-bottom:3px}.flow{display:grid;gap:8px;margin:20px 0}.step{display:grid;grid-template-columns:94px minmax(0,1fr);gap:14px;border-bottom:1px solid var(--line);padding:10px 0}.step b{font-family:var(--mono);font-size:12px;color:var(--accent)}.step span{min-width:0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{border:1px solid var(--line);padding:13px 15px;min-width:0}.card h3{margin:0 0 5px}.card p{margin:0}.status{font:700 10px var(--mono);letter-spacing:.04em;color:var(--accent)}.status.pending{color:var(--warn)}.status.missing{color:var(--bad)}.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}th,td{padding:10px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:700;background:var(--soft)}ul,ol{padding-left:21px}li{margin:6px 0}code{font-family:var(--mono);background:var(--code);padding:1px 4px;border-radius:3px;overflow-wrap:anywhere}pre{font:12px/1.65 var(--mono);background:var(--code);padding:14px 16px;white-space:pre-wrap;overflow-x:auto}.ref{font:11px/1.6 var(--mono);color:var(--muted);overflow-wrap:anywhere}.mini{font-size:12px;color:var(--muted)}a{color:var(--accent)}.badge{display:inline-block;border:1px solid var(--line);font:11px var(--mono);padding:4px 7px;margin:2px 3px 2px 0}@media(max-width:800px){main{display:block}.rail{position:static;display:flex;overflow-x:auto;gap:4px;white-space:nowrap;margin-bottom:14px}.rail .eyebrow{display:none}.rail a{border-left:0;border-bottom:2px solid var(--line);flex:none}.sheet{padding:22px 16px}.grid{grid-template-columns:1fr}.step{grid-template-columns:1fr;gap:2px}}
+</style>
+<main>
+<nav class="rail" aria-label="目录"><div class="eyebrow">IMPLEMENTATION MAP</div><a href="#basis">依据与版本</a><a href="#boundary">三层承诺</a><a href="#issuance">申领主链</a><a href="#runtime">运行装配</a><a href="#tools">能力与界面</a><a href="#collab">可信协同</a><a href="#gaps">必须修补的断点</a><a href="#delivery">交付顺序与验收</a></nav>
+<article class="sheet">
+<div class="kicker">TPAA / AG2 1.2.2 / DESIGN PROPOSAL</div>
+<h1>从 PHC 申领到可运行智能体</h1>
+<p class="lead">把用户在 AP 目录里选择的能力，经 D4 的 CMI 承诺、D5 的持有者核验、D6 的 DID 与最终 PHC，交付为可验证构建、可配置执行、可追溯协同的 AG2 实例。这里给的是实施方案，不宣称现有工作台已打通这条链。</p>
+<div class="meta">方案性质：待实施 · 依据：TPAA 说明书的仓库勘误与协议映射、已找到的《TPAA平台完整系统方案》V6 第 18 章、当前代码 · 不替代安全评审</div>
+<div class="callout warn"><strong>来源说明</strong>仓库勘误称《TPAA说明书.docx》为冲突时的权威来源，但本工作区没有该说明书原件；本次可直接核对的是《TPAA平台完整系统方案.docx》与《TPAA×AG2复现方案.docx》，以及仓库的 v1 勘误和代码。凡文档中的旧 proto0 时序与 v1 G1–D6 冲突，以核实后的 v1 勘误/协议实现为本次设计基线；说明书原件仍需在最终规范评审时逐条复核。</div>
+
+<section id="basis"><h2>01 · 依据与适用版本</h2>
+<div class="grid"><div class="card"><h3>理论与产品意图</h3><p>《TPAA平台完整系统方案》V6 §9.1–9.3 描述申领、能力选配、交付；§18.1–18.5 要求运行时读取装配清单、校验 CMI、按所选模块装配工具、中间件和用户私有 Hub。§18.2 明确未选模块的工具不得装入 Agent；§18.3 分开网络、工具、凭证披露和派生审批。</p></div><div class="card"><h3>v1 协议口径</h3><p>仓库 <code>docs/protocol-errata/tpaa_v1.md</code> 的 E1–E18/N1–N4 修正旧推导；<code>docs/protocol-map/tpaa_v1.md</code> 将 G1–D6 映射到实现与测试。E9 将 CMI 定义为按有序模块的 ID、版本、摘要与 H(ID) 构造的 HCGen，不等于简单的能力名称列表。</p></div></div>
+<div class="callout danger"><strong>不能混用两个 D1–D6</strong><code>services/ap_side/agent_service/domain/usecases/issue_agent.py</code> 是旧 proto0 业务申领，用 <code>did:tpaa</code>、另一套 CMI 和不同的封 DID/写 CMI 顺序。v1 应沿 <code>crypto/tpaa_v1/proto_user.py</code>、<code>proto_ap.py</code>、<code>proto_tp.py</code> 及 <code>services/ap_side/agent_service/v1_app.py</code> 扩展。旧 §18 的 agent.yaml 是设计意图，不能不经迁移直接视为 v1 已签发制品。</div>
+<p class="ref">依据：docs/protocol-errata/tpaa_v1.md:3-4,20-37,41-60；docs/protocol-map/tpaa_v1.md:9-37；README.md:604-627；原始 V6 文档 §9、§18（已在本地 DOCX 核对）。</p></section>
+
+<section id="boundary"><h2>02 · 三层承诺与能力的真实含义</h2>
+<div class="flow"><div class="step"><b>PHC / DID</b><span>“是谁”。G3 先得初始 PHC，D4 把选配模块的 CMI 写进 APM，D6 后取得最终 PHC'' 与 did:wba；PHC.TPM 里存的是加密的 CDID，不是可直接展示的明文 DID。</span></div><div class="step"><b>CMI / build</b><span>“由什么构成”。模块仓库的真实版本与内容摘要按确定顺序进入 HCGen；交付时核对安装字节、模块摘要、PHC.APM.CMI 与确定性 buildDigest。</span></div><div class="step"><b>Policy / tools</b><span>“此刻允许做什么”。Manifest 里的工具、操作、连接器和权限必须是 AP 批准模块的允许子集；运行期开关只能在已签策略的边界内缩小权限，不能点击页面就凭空增添新的 PHC 能力。</span></div></div>
+<p>一项可选能力至少包含：<code>moduleId@version</code>、仓库字节摘要、AG2 工具导出清单、真实执行器与就绪检查、权限/风险/审批策略、数据范围、连接器 <code>secretRef</code>。<strong>CMI 承诺模块构成，不自动承诺后来随意修改的工具策略。</strong>必须由 AP 对选定策略和 Manifest 另行核准并签署运行证明。</p>
+<p class="ref">依据：errata E9/E10/N2；crypto/tpaa_v1/engine.py:194-201；crypto/tpaa_v1/schema.py:32-58,79-96；packages/tpaa_runtime/manifest.py:1-5,34-70,73-147；V6 §18.1–18.3。</p></section>
+
+<section id="issuance"><h2>03 · 用户申领主链：严格按 v1 顺序</h2>
+<div class="flow">
+<div class="step"><b>G1 → G4</b><span>用户钱包签加密 CR；TP 验证并经审核证据闸门发初始 PHC/TPAC；用户在 G4 校验签名、AF、归属与槽位并保存钱包凭证。此时尚未承诺所选 AG2 技能，也尚无最终 DID。</span></div>
+<div class="step"><b>D1 → D3</b><span>用户持钱包凭证签 AR 给 AP；AP 认证持有人并回密文 CMM（真实、未下架模块目录）；用户在 UI 选模块与版本，先展示风险、执行器状态、授权范围，再对选项和 CMM 版本签 PACI。AP 只从受信仓库取摘要，拒绝篡改/下架版本和重复“同身份 + 同选择”。</span></div>
+<div class="step"><b>D4</b><span>AP 按选择的有序模块计算 <code>CMI = HCGen(CMC,H(ID))</code>；算法 1 更新 PHC.APM（CMI、AFRef）并做 AF 重绑，AP 保留本地记录与开口；密文 PAR 回钱包。此处只承诺选到的模块，不把未连接的工具标成已就绪。</span></div>
+<div class="step"><b>D5</b><span>钱包验 PHC'、逐模块重算 CMI 与 AF/AFRef；确认通过才签并加密 DIDGR 给 TP。失败则停止签发，不把“不一致”自动修复成另一份。</span></div>
+<div class="step"><b>D6</b><span>TP 验 DIDGR，创建 CSCID / did:wba、把 DID 加密成 CDID、重封 ECID 并执行算法 2；用户钱包验最终 PHC''、解 CDID，得到 DID。只有钱包接受的最终凭证才可进入交付发布。</span></div>
+<div class="step"><b>交付</b><span>AP 以最终 DID 关联经认证的 D4 构建记录，确定性打包 agent.yaml、模块与摘要/版本。发布 <code>最终 PHC 摘要、CMI、AFRef、有序模块摘要、实际 buildDigest、被批准的工具策略</code>；一份制品可复验，但不包含用户明文身份、TP/AP 私钥或 Provider API Key。</span></div>
+</div>
+<div class="callout"><strong>模块目录不能把“可支持”当“可申领”</strong>现有工作台列出 22 项设计能力；只有与 CMM 仓库实际模块和可用 Connector 对应、且 AP 授权的选项才能提交 PACI。<code>web.search</code> 等待配置、<code>desktop.control</code> 非 AG2 原生的条目只能作为目录说明，不能进入已签发 CMI 或工具表。</div>
+<p class="ref">依据：docs/protocol-map/tpaa_v1.md:12-30；crypto/tpaa_v1/proto_user.py:53-105,113-134,152-214；crypto/tpaa_v1/proto_ap.py:45-125；crypto/tpaa_v1/proto_tp.py:135-208；services/ap_side/agent_service/v1_app.py:60-141；errata E14/E15/E17。</p></section>
+
+<section id="runtime"><h2>04 · 用户拿到智能体后的运行装配</h2>
+<pre>钱包已接受的 PHC'' + DID
+  → 用户签挑战登录，运行服务核对会话 owner
+  → AP 读取最终签发台账 / 只读已发布 build
+  → 验 PHC 公开证明、DID↔PHC 的 TP 绑定、状态与父体状态
+  → 重算安装模块摘要 → HCGen 与 PHC.APM.CMI 对齐
+  → 重算 buildDigest → 核对发布记录；装配受批准的 Manifest
+  → AP 核准 Manifest digest + 允许工具/策略，绑定临时会话公钥
+  → AG2 Agent(tools=仅允许的已就绪工具) + Guard + Gateway
+  → 运行；每次调用实时复核状态、scope、策略与确认</pre>
+<p>V6 §18.5 明确“读取 agent.yaml → CMI 三处对比 → 装配工具 → 注入运行服务 → 实例化 AG2 → 可运行”；现有 <code>trust.py</code> 已有同进程 DidBinding/运行证明演示，但生产服务不能把 TP/AP HSM 对象直接传给运行进程。应增加经鉴权的 TP 绑定声明 API 与 AP 证明 API，运行服务只使用公开验证材料和短期会话密钥。</p>
+<div class="grid"><div class="card"><h3>启动失败处理</h3><p>PHC 未完成 D6、owner 不符、模块字节变化、CMI/buildDigest 不符、证书过期或状态不新鲜，全部 fail closed。冻结并告警，不启动 Agent、不回退到静态 Demo DID。</p></div><div class="card"><h3>升级和运行中开关</h3><p>关闭已授权工具仅为运行时策略收紧；新版本/新模块/超原范围的工具需重新选配、再算 CMI、更新凭证与已发布制品。旧会话按版本钉住，不能借新开关获得越权能力。</p></div></div>
+<p class="ref">依据：V6 §18.1–18.5；services/ap_side/agent_service/domain/services/build.py:27-84,96-135；packages/tpaa_runtime/trust.py:185-254；packages/tpaa_runtime/runtime.py:43-115；errata E8/E9。</p></section>
+
+<section id="tools"><h2>05 · 能力配置与工作台如何合流</h2>
+<div class="tablewrap"><table><thead><tr><th>用户看见的状态</th><th>运行时动作</th><th>例子</th></tr></thead><tbody>
+<tr><td>目录可选 / 可申领</td><td>CMM 中有受信、未下架模块且可验证执行器；PACI 可选</td><td>有真实实现的 knowledge.search</td></tr>
+<tr><td>已签发 / 待连接</td><td>模块已进入 CMI，但 Connector/用户授权未完成；工具不注册，显示缺项</td><td>已签搜索模块，搜索 API 尚未配置</td></tr>
+<tr><td>可运行</td><td>模块、build、策略、Connector 健康都通过；仅将允许的工具装入 AG2</td><td>本地文件只读、受限计算</td></tr>
+<tr><td>暂停 / 已吊销</td><td>停止新调用与跨体消息，保留审计和文件以便取证</td><td>失效凭证、父体吊销</td></tr>
+<tr><td>设计项 / 不支持</td><td>不能勾选为授权，也不生成工具；说明需要何种外部 Worker</td><td>Windows 桌面控制</td></tr>
+</tbody></table></div>
+<p>工作台六个页面应从同一服务状态读取：①申领进度（G1–D6、审批和钱包确认）；②能力配置（CMM/选择/授权范围/版本）；③运行对话（AG2 实际调用轨迹与来源）；④任务/文件（任务、确认、产物及 build 版本）；⑤协同（对端验证与 scope）；⑥审计（拒绝、确认、版本、状态）。右侧显示 PHC 版本、CMI、Manifest digest、签发状态和就绪原因；绝不把硬编码的“PHC 已验证”当真实证明。</p>
+<p class="ref">依据：V6 §18.2–18.5；demos/personal_agent/run_ag2_workspace.py:40-75,150-225,265-328；packages/tpaa_runtime/manifest.py:34-70；README.md:625-626。</p></section>
+
+<section id="collab"><h2>06 · 可信协同与人工确认</h2>
+<div class="flow"><div class="step"><b>发送</b><span>主智能体发起协同前核本人状态、出站 scope、对端目录；签署含 from/to、nonce、期限、任务和运行证明引用的信封。AG2 可用 Hub/Channel/TransitionGraph 管编排，但网络可信判断由 TPAA 证明验证和专用 Arbiter/入口共同实施。</span></div><div class="step"><b>接收</b><span>对端验 PHC、TP/AP 证明、Manifest digest、状态新鲜度、会话签名、有效期、重放与入站允许范围；回信绑定原请求 nonce。子体持独立 PHC/DID/CMI，父体吊销需级联停用；子体之间默认不得直连。</span></div><div class="step"><b>确认</b><span>工具调用提交确认请求，不直接执行。票据绑定 owner、session、DID、Manifest digest、工具与准确参数摘要、Connector、到期时间、一次性 nonce。批准后原子核销，复查当前策略和状态，再经同一 Gateway 执行；拒绝/超时也审计。</span></div></div>
+<p><strong>不同的人类确认不能混用：</strong>G1 的审查批准（E17）、子体派生的显式人工知情确认（V6 §4/§9.3）、运行时高风险工具确认（V6 §18.3）分别绑定不同动作和证据；不能用“记住 7 天”代替逐次审批。</p>
+<p class="ref">依据：V6 §4.1–4.5,§9.3,§18.3–18.4；errata E17/E18；packages/tpaa_runtime/trust.py:269-313；packages/tpaa_runtime/sandbox.py:56-84。</p></section>
+
+<section id="gaps"><h2>07 · 现有实现的断点，不能跳过</h2>
+<div class="tablewrap"><table><thead><tr><th>断点</th><th>当前事实</th><th>实施要求</th></tr></thead><tbody>
+<tr><td>权威申领链</td><td>旧 proto0 申领链与 v1 G1–D6 同名不同义；README 还记载旧版 K5。</td><td>选定 v1 为唯一发布路径；旧 API 标记为演示/迁移，不能把 proto0 产物直接当 v1 运行。</td></tr>
+<tr><td>签发到交付</td><td>AP v1 服务记录 D4 的 ApRecord，但未有“已接受 DID → 最终 PHC → build/策略”的发布台账。</td><td>补完成/发布事务与跨 TP/AP/钱包的可重试、幂等、对账状态；关联原申请及 D5/D6 接受。</td></tr>
+<tr><td>CMI 算法</td><td>AG2 Manifest 的演示默认用 sha256(DID) 代替 H(ID)；旧 proto0 又有另一套 hash_chain。</td><td>正式链路禁止该默认；只接受钱包/AP 验证过的 v1 CMI，并校验有序模块字节。</td></tr>
+<tr><td>构建证明</td><td>当前 Manifest.build_digest 摘要的是尚未写入 buildDigest 的草稿，而非可执行制品字节。</td><td>以确定性 BuildPlan 的实际文件字节摘要为唯一 buildDigest；AP 验安装字节与其授权的工具策略。</td></tr>
+<tr><td>Web 工作台</td><td>run_ag2_workspace.py 无真实 PHC/owner 会话；API Key、草稿、确认在进程全局，确认请求不能安全对应当前用户。</td><td>按 authenticated owner+DID+session 隔离；本地演示服务不得公网暴露；接入密钥引用和持久化审批。</td></tr>
+<tr><td>动态状态</td><td>StatusRegistry、信封 nonce 与待回复集在内存；IdentityGuard 只做局部状态/过期检查。</td><td>新鲜状态证明或 fail-closed 查询，持久 nonce/会话/审计；启动和每次高风险调用验完整信任链与策略版本。</td></tr>
+</tbody></table></div>
+<p class="ref">依据：issue_agent.py:75-188；services/ap_side/agent_service/v1_app.py:90-141；packages/tpaa_runtime/manifest.py:155-180；packages/tpaa_runtime/trust.py:163-182,238-254；packages/tpaa_runtime/runtime.py:43-65；demos/personal_agent/run_ag2_workspace.py:72-75,229-325。</p></section>
+
+<section id="delivery"><h2>08 · 分阶段实现与可验收证据</h2>
+<ol><li><strong>P0 · 锁定协议与数据契约。</strong>核对说明书原件；将 v1 与 proto0 API/制品分开；冻结“模块→工具→执行器”规范、CMI 顺序、buildDigest 口径及用户/TP/AP 各自拥有的数据。验收：一个选择向量在钱包/AP/打包侧得到相同 CMI，顺序/字节篡改被拒。</li>
+<li><strong>P1 · 完成 G1–D6 到发布。</strong>保持现有 v1 服务端签名/加密入口；补钱包接受后 DID→构建发布映射、幂等关联与认证。验收：完整 HTTP 申领后重启服务仍能以 owner+DID 取回最终 PHC、模块清单和 build；跨用户请求、重放、错误顺序均拒绝。</li>
+<li><strong>P2 · 构建受信运行实例。</strong>已发布模块和工具策略核对 → TP DID 绑定 → AP 运行证明 → AG2 装配。验收：更换任意文件字节、偷加工具、过期/吊销或换 PHC，均在 Agent 启动前拒绝。</li>
+<li><strong>P3 · 统一工作台和 Gateway。</strong>将现有 22 项目录改为 CMM/Connector 的实时投影；只让已签发且 ready 的能力进入 Agent；任务/确认/审计按 owner/session 绑定。验收：新会话工具清单与授权一致；未配置 Web 服务不显示“已执行”；跨会话确认和重复确认失败。</li>
+<li><strong>P4 · 协同与生命周期。</strong>先做本地两 Agent 完整验签回路，再接 Hub/Channel 和跨服务路由；再做父子体级联/TTL/持久重放缓存。验收：合法 scope 成功、越权/篡改/重放/吊销均失败，重启后仍保留必要的状态与审计。</li></ol>
+<div class="callout"><strong>演示终点</strong>在浏览器里由用户完成 G4 → 选择真实可用能力 → D5 接受 → D6 获最终 DID → 一键启动 → 查看 AG2 实际工具轨迹 → 自己批准一次文件写入 → 两 Agent 验证协同 → 吊销后调用被拒。每一步都展示实际请求/状态/证据摘要，不展示私钥、H(ID) 或身份明文。</div>
+<p class="mini">明确不在首轮宣称：Windows 桌面自动化、邮箱/日历/地图/图像服务、真实外网搜索已接通；这些必须由各自 Connector 与权限测试单独验收。</p></section>
+</article></main>

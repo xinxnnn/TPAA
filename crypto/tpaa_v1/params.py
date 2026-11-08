@@ -1,0 +1,53 @@
+"""tpaa_v1 公共参数 pp（说明书「初始化阶段」，按 errata E11 固定）。
+
+说明书只写了"选一个质数 p 与 Z_p* 的生成元 g"，没给参数。这里定为：
+    p  RFC 3526 第 15 组（3072 bit MODP，安全素数 p = 2q + 1）
+    q  (p − 1) / 2，素数
+    g  4 —— 任何平方数都落在 q 阶子群里，不依赖"2 是否为二次剩余"
+
+★ 为什么必须是素数阶子群：
+  AF 的变色龙碰撞要在指数上做除法（见 cch.py），指数环必须是域 Z_q。
+  旧参考实现用 p = 2^127 − 1、q = p − 1：p − 1 可完全分解成小因子（最大 37 bit），
+  Pohlig–Hellman 能直接算出离散对数 —— 那套参数下所有私钥都是公开的。
+"""
+
+from __future__ import annotations
+
+from secrets import randbelow
+
+_P_HEX = (
+    "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
+    "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
+    "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
+    "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
+    "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D"
+    "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F"
+    "83655D23DCA3AD961C62F356208552BB9ED529077096966D"
+    "670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B"
+    "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9"
+    "DE2BCBF6955817183995497CEA956AE515D2261898FA0510"
+    "15728E5A8AAAC42DAD33170D04507A33A85521ABDF1CBA64"
+    "ECFB850458DBEF0A8AEA71575D060C7DB3970F85A6E1E4C7"
+    "ABF5AE8CDB0933D71E8C94E04A25619DCEE3D2261AD2EE6B"
+    "F12FFA06D98A0864D87602733EC86A64521F2B18177B200C"
+    "BBE117577A615D6C770988C0BAD946E208E24FA074E5AB31"
+    "43DB5BFCE0FD108E4B82D120A93AD2CAFFFFFFFFFFFFFFFF"
+)
+
+P = int(_P_HEX, 16)
+Q = (P - 1) // 2
+G = 4
+PARAMS_ID = "tpaa_v1/rfc3526-3072/g4"
+
+
+def in_subgroup(x: int) -> bool:
+    """x 是否属于 q 阶子群。外部传进来的群元素（AF、陷门公钥）一律先过这一关。"""
+    return 1 < x < P and pow(x, Q, P) == 1
+
+
+def rand_exp() -> int:
+    """Z_q* 上的均匀随机指数（绑定随机数 r_bind 用它）。"""
+    return randbelow(Q - 1) + 1
+
+
+__all__ = ["P", "Q", "G", "PARAMS_ID", "in_subgroup", "rand_exp"]

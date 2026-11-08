@@ -1,0 +1,25 @@
+[project]
+name = "tpaa-platform"
+version = "0.1.0"
+description = "TPAA 个人智能体身份平台（与《TPAA平台完整系统方案》配套）"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# 核心密码层刻意保持零第三方依赖：只用标准库，便于审计与移植。
+dependencies = []
+
+[project.optional-dependencies]
+# 后续接入 AG2 运行时与后端服务时才需要
+runtime = ["ag2[openai]>=1.1.2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [".", "packages"]
+include = ["crypto*", "services*", "tpaa_runtime*", "contracts*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"

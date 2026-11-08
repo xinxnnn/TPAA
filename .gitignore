@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage*
+htmlcov/
+build/
+
+# Node
+node_modules/
+dist/
+
+# Local configuration, credentials, and runtime state
+.env
+.env.*
+!.env.example
+.tpaa-local-check/
+local-config.json
+staff-hsms.json
+*-seed.json
+*seed*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+*.log
+*.tmp
