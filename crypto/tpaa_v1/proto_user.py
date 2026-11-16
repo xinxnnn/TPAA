@@ -174,6 +174,8 @@ def d5_accept_par(*, user_hsm, par_box: dict, cred: WalletCred, tp_sign_pk,
 
     # 式 8：用户用 PA 里的模块自己重算 CMI
     mods = [(m["moduleId"], m["version"], m["digest"]) for m in par["PA"]["modules"]]
+    if phc1.apm.modules is not None and phc1.apm.modules != par["PA"]["modules"]:
+        raise ProtocolError("D5：PHC 中的能力模块清单与 PA 不一致，CMI 无法对应")
     cmi = hcgen(mods, cred.hid)
     if cmi != phc1.apm.cmi:
         raise ProtocolError("D5：重算的 CMI 与 PHC 中的 CMI 不一致")

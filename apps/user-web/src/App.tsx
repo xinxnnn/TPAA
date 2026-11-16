@@ -120,7 +120,7 @@ export default function App() {
   return <div className="app-shell">
     <BrandBar initialization={initialization} testAdapterSessionActive={localSession?.enabled && localSession.authenticated} />
     <main className="content-wrap">
-    <div className="page-intro"><div><span className="section-kicker">TPAA V1 · PROTOCOL FLOW</span><h1>身份凭证与能力授权</h1><p>由用户主动提交申请、等待 TP 审批，并逐步执行 G3–D6；页面只自动同步状态，不会生成样例申请或自动推进流程。本轮不包含 Agent 制品或 Runtime。</p></div><div className="profile-note">执行环境：{initialization?.checks.executionProfile ?? '连接中'} · 用户独立控制：{initialization?.checks.userControlledExecution ? '是' : '否'}</div></div>
+    <div className="page-intro"><div><span className="section-kicker">TPAA V1 · PROTOCOL FLOW</span><h1>身份凭证与能力授权</h1><p>由用户主动提交申请、等待 TP 审批，并逐步执行 G3–D6；最终 PHC 接受后，AP 发布制品并交付用户本地。实际对话需在本机配置模型 API。</p></div><div className="profile-note">执行环境：{initialization?.checks.executionProfile ?? '连接中'} · 用户独立控制：{initialization?.checks.userControlledExecution ? '是' : '否'}</div></div>
     {localSession?.enabled && <div className="demo-banner" role="status">本地 test-adapter · 仅使用合成身份和测试照片 · 本地会话只用于开发验证，不代表真实用户认证</div>}
     {bootError && <div className="global-error" role="alert">{bootError}</div>}
     {initialization && <section className="card initialization-card" aria-labelledby="initialization-heading">

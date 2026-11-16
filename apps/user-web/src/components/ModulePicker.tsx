@@ -8,6 +8,9 @@ type Props = {
 }
 
 export function ModulePicker({ catalog, selection, onChange, disabled }: Props) {
+  const ordered = (items: Selection[]) => catalog.flatMap(category =>
+    category.options.flatMap(version => items.filter(item =>
+      item.moduleId === category.id && item.version === version)))
   if (!catalog.length) return <p className="inline-hint">能力目录尚未返回；请先拉取 CMM。</p>
   return <div className="module-picker" aria-label="AP 能力目录">
     {catalog.map(category => <fieldset key={category.id} disabled={disabled}>
@@ -17,7 +20,7 @@ export function ModulePicker({ catalog, selection, onChange, disabled }: Props) 
         return <label key={version} className="module-choice">
           <input type="checkbox" checked={present} onChange={() => onChange(present
             ? selection.filter(item => item.moduleId !== category.id || item.version !== version)
-            : [...selection, { moduleId: category.id, version }])} />
+            : ordered([...selection, { moduleId: category.id, version }]))} />
           <span>{category.id} · {version}</span>
         </label>
       })}</div>

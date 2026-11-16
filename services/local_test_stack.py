@@ -379,13 +379,11 @@ def build_stack(*, ap_assist=None) -> Stack:
         hsm = local_demo_staff_hsms.get(staff_id)
         if claims.get("role") != "supervisor" or hsm is None:
             raise HTTPException(status_code=403, detail="a local supervisor session is required")
-        from crypto.tpaa_v1.case import sign_case_approval
-
         case_id, did, purpose = body.get("caseId"), body.get("did"), body.get("purpose")
         if not all(isinstance(value, str) and value.strip()
                    for value in (case_id, did, purpose)):
             raise HTTPException(status_code=400, detail="caseId, did and purpose are required")
-        return sign_case_approval(hsm, case_id=case_id, did=did, purpose=purpose)
+        return crypto.sdk.v1.case.sign_case_approval(hsm, case_id=case_id, did=did, purpose=purpose)
 
     return Stack(combined, tp_auth, ap_auth, review_hsm)
 

@@ -73,7 +73,10 @@ def assemble(
         "bundleDigest": _digest_bundle(bundle),
     }, ensure_ascii=False, indent=2, sort_keys=True).encode()
 
-    files = {"agent.yaml": agent_yaml, "integrity.json": integrity, **bundle}
+    from pathlib import Path
+    runner = Path(__file__).with_name("issued_runner.py.txt").read_bytes()
+    files = {"agent.yaml": agent_yaml, "integrity.json": integrity,
+             "run.py": runner, **bundle}
     manifest = {
         "files": {rel: _h(data) for rel, data in sorted(files.items())},
         "buildDigest": hashlib.sha256(

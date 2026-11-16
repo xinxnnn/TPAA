@@ -43,6 +43,10 @@ class _Op:
     needs_app: bool = True
 
 
+async def _local_chat(h, lb: str, args: dict):
+    return await h.local_agent(lb, args["text"], application_id=args["applicationId"])
+
+
 OPERATIONS: dict[str, _Op] = {
     "set-application": _Op(
         args=("appId",), needs_app=False, mutates=True,
@@ -80,6 +84,15 @@ OPERATIONS: dict[str, _Op] = {
     "credential": _Op(
         args=(), mutates=False,
         call=lambda h, lb, a: h.credential(lb)),
+    "deliver-agent": _Op(
+        args=("publication",), mutates=True,
+        call=lambda h, lb, a: h.deliver_agent(lb, a["publication"])),
+    "agent-receipt": _Op(
+        args=(), mutates=False,
+        call=lambda h, lb, a: h.agent_receipt(lb)),
+    "local-chat": _Op(
+        args=("text",), mutates=False, needs_app=True,
+        call=_local_chat),
     "pending-request": _Op(
         args=(), needs_app=False, mutates=False,
         call=lambda h, lb, a: h.pending_request(lb)),
@@ -153,6 +166,11 @@ def create_app(*, ctx: ExecutorContext) -> FastAPI:
         """读 body 并限长。一个执行器只服务一个 owner，没有大请求的正当用途。"""
         declared = request.headers.get("content-length")
         if declared is not None and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+            # Drain a small overage before returning 413 so the Windows client
+            # can receive the response rather than a TCP reset. Never buffer
+            # arbitrarily large declared bodies.
+            if int(declared) <= MAX_BODY_BYTES + 64 * 1024:
+                await request.body()
             raise HTTPException(status_code=413, detail="executor request too large")
         try:
             raw = await request.body()
@@ -236,8 +254,12 @@ def create_app(*, ctx: ExecutorContext) -> FastAPI:
         execution_label = label(body, body.get("owner", ""))
 
         args = {k: v for k, v in body.items() if k not in _ENVELOPE}
+        if operation == "local-chat":
+            args["applicationId"] = body["applicationId"]
         if not spec.mutates:
             check_application(operation, spec, body, execution_label)
+            if operation == "local-chat":
+                return shape(await _local_chat(ctx.handler, execution_label, args))
             return shape(spec.call(ctx.handler, execution_label, args))
 
         # 幂等要在业务校验之前：重放必须拿回首次结果，而不是被绑定检查拦掉。
@@ -271,7 +293,10 @@ def _from_env():
     bind = os.environ.get("TPAA_EXECUTOR_BIND", "127.0.0.1").strip()
     if bind not in {"127.0.0.1", "::1", "localhost"}:
         raise RuntimeError("test executor must bind to loopback only")
-    handler = UserCredentialHandler(Path(env_required("TPAA_EXECUTOR_STATE_ROOT")))
+    handler = UserCredentialHandler(
+        Path(env_required("TPAA_EXECUTOR_STATE_ROOT")),
+        agent_root=Path(os.environ.get("TPAA_LOCAL_AGENT_ROOT") or
+                        Path(env_required("TPAA_EXECUTOR_STATE_ROOT")).parent / "localstore"))
     return create_app(ctx=ExecutorContext(handler=handler, token=env_required("TPAA_EXECUTOR_TOKEN")))
 
 

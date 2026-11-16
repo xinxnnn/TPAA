@@ -291,6 +291,18 @@ def test_v1_malicious_trace_requires_ap_approved_dual_signatures_and_seals_ident
         r.close()
 
 
+def test_ap_resolves_modules_in_cmm_order_independent_of_request_order():
+    from services.ap_side.agent_service.v1_app import AgentV1Desk
+
+    r = Rig()
+    desk = AgentV1Desk(r.agent_ctx)
+    expected = desk.resolve(SEL)
+    assert desk.resolve(list(reversed(SEL))) == expected
+    assert v1.hcgen(expected, 123) == v1.hcgen(desk.resolve(list(reversed(SEL))), 123)
+    with pytest.raises(v1.ProtocolError, match="重复"):
+        desk.resolve([SEL[0], SEL[0]])
+
+
 def test_d4_retry_replays_saved_result_and_rejects_changed_paci():
     flow = _happy()
     r = flow["rig"]

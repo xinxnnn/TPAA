@@ -60,6 +60,11 @@ class ProtocolExecutor(Protocol):
     def accept_final(self, label: str, *, owner: str, application_id: str) -> dict: ...
     def publication_receipt(self, label: str, *, owner: str, application_id: str) -> dict: ...
     def credential(self, label: str, *, owner: str, application_id: str) -> dict: ...
+    def deliver_agent(self, label: str, publication: dict, *, owner: str,
+                      application_id: str) -> dict: ...
+    def agent_receipt(self, label: str, *, owner: str, application_id: str) -> dict: ...
+    def local_chat(self, label: str, text: str, *, owner: str,
+                   application_id: str) -> dict: ...
     def pending_request(self, label: str, *, owner: str) -> dict: ...
     def events(self, label: str, *, owner: str, application_id: str | None = None) -> list[dict]: ...
 
@@ -282,7 +287,8 @@ class PortalDesk:
             raise ValueError("人脸照片内容与声明的图片格式不匹配")
 
     _STAGE_ORDER = {"INIT": 0, "G1": 1, "REVIEW": 2, "G3": 3, "G4": 4, "D1": 5,
-                    "D2": 6, "D3": 7, "D4": 8, "D5": 9, "D6": 10, "FINAL": 11, "PUB": 12, "RUN": 13}
+                    "D2": 6, "D3": 7, "D4": 8, "D5": 9, "D6": 10, "FINAL": 11,
+                    "PUB": 12, "DELIVER": 13, "RUN": 14}
 
     def _merge_review(self, row: dict) -> dict:
         """把 TP 的 REVIEW 事件并进一份**副本**，不落盘。
@@ -354,6 +360,9 @@ class PortalDesk:
             "awaiting_final_acceptance": "accept-final",
             "issuing": "reconcile",
             "issue_failed": "reconcile",
+            "d6_accepted": "publish",
+            "published": "deliver-agent",
+            "agent_delivered": "start-runtime",
         }.get(row["state"])
 
     def issue(self, owner: str, app_id: str) -> dict:
@@ -404,6 +413,7 @@ class PortalDesk:
                               "phcVersion": issued["phcVersion"],
                               "rrDigest": v1.json_digest(issued["rr"]),
                               "phcDigest": acceptance["phcDigest"],
+                              "phc": acceptance["phc"],
                               "rrEnvelope": issued["rr"],
                               "executorAcceptance": "verified"}})
         row["state"] = "awaiting_g4_acceptance"
@@ -470,7 +480,7 @@ class PortalDesk:
         result = self._executor(owner).accept_g4(row["executorLabel"], owner=owner,
                                                  application_id=app_id)
         row["events"].append({"stage": "G4", "status": "user_accepted", "at": self.ctx.clock.now(),
-                              "artifacts": {k: result[k] for k in ("phcDigest", "phcVersion", "accepted")}})
+                              "artifacts": {k: result[k] for k in ("phcDigest", "phcVersion", "phc", "accepted")}})
         row["state"] = "phc_accepted"
         self._save(row)
         return self.timeline(owner, app_id)
@@ -493,6 +503,7 @@ class PortalDesk:
                                                                        application_id=app_id))
                         if event["stage"] == "D1")
         result = {"requestId": d1_event["artifacts"]["requestId"],
+                  "arEnvelope": ar, "arDigest": v1.json_digest(ar),
                   "cmmVersion": cmm["version"], "categories": cmm["categories"]}
         row["events"].append({"stage": "D1", "status": "complete", "at": self.ctx.clock.now(), "artifacts": result})
         row["events"].append({"stage": "D2", "status": "complete", "at": self.ctx.clock.now(),
@@ -512,6 +523,12 @@ class PortalDesk:
         offered = {(category["id"], version) for category in row["cmm"]["categories"] for version in category["options"]}
         if any((item.get("moduleId"), item.get("version")) not in offered for item in selection):
             raise ValueError("选择中包含 CMM 未提供的模块或版本")
+        order = {(category["id"], version): (i, j)
+                 for i, category in enumerate(row["cmm"]["categories"])
+                 for j, version in enumerate(category["options"])}
+        if len({(item["moduleId"], item["version"]) for item in selection}) != len(selection):
+            raise ValueError("选择中包含重复模块版本")
+        selection = sorted(selection, key=lambda item: order[(item["moduleId"], item["version"])])
         executor = self._executor(owner)
         paci = executor.build_paci(row["executorLabel"], selection=selection,
                                    owner=owner, application_id=app_id)
@@ -519,8 +536,10 @@ class PortalDesk:
         row["recordId"] = result["recordId"]
         row["events"].append({"stage": "D3", "status": "user_confirmed", "at": self.ctx.clock.now(),
                               "artifacts": {"selection": selection, "selectionDigest": v1.json_digest(selection),
+                                            "paciEnvelope": paci, "paciDigest": v1.json_digest(paci),
                                             "cmmVersion": row["cmm"]["version"]}})
         d4_artifacts = {"recordId": result["recordId"],
+                        "par": result["par"],
                         "cmi": result["event"]["artifacts"]["cmi"],
                         "moduleCount": result["event"]["artifacts"].get("moduleCount", len(selection)),
                         "modules": result["event"]["artifacts"].get("modules", []),
@@ -601,6 +620,8 @@ class PortalDesk:
             application_id=app_id)
         row["didgr"] = didgr
         row["events"][-1]["artifacts"]["userAccepted"] = True
+        row["events"][-1]["artifacts"]["didgrEnvelope"] = didgr
+        row["events"][-1]["artifacts"]["didgrDigest"] = v1.json_digest(didgr)
         row["state"] = "d5_accepted"
         self._save(row)
         return self.timeline(owner, app_id)
@@ -635,7 +656,7 @@ class PortalDesk:
         row["events"].append({"stage": "FINAL", "status": "verified_by_user_executor",
                               "at": self.ctx.clock.now(),
                               "artifacts": {k: result[k] for k in ("did", "phcDigest",
-                                                                   "phcVersion", "cmi")}})
+                                                                   "phcVersion", "cmi", "phc")}})
         row["state"] = "awaiting_final_acceptance"
         self._save(row)
         return self.timeline(owner, app_id)
@@ -671,27 +692,68 @@ class PortalDesk:
         self._save(row)
         return self.timeline(owner, app_id)
 
-    def start_runtime(self, owner: str, app_id: str) -> dict:
+    def deliver_agent(self, owner: str, app_id: str) -> dict:
         row = self._row(owner, app_id)
-        if row["state"] == "agent_constructed":
+        if row['state'] == 'agent_delivered':
+            self._executor(owner).agent_receipt(row['executorLabel'], owner=owner,
+                                                application_id=app_id)
             return self.timeline(owner, app_id)
-        if self._next_action(row) != "start-runtime":
-            raise ValueError("只有已发布并已接受 FINAL 的制品才能启动 Runtime")
-        executor = self._executor(owner)
-        credential = executor.credential(row["executorLabel"], owner=owner,
-                                         application_id=app_id)
-        runtime = self.ctx.agent.post(
-            f"/v1/tpaa/publications/{row['recordId']}/runtime",
-            {"did": credential["did"], "phc": credential["phc"]}, owner)
-        row["events"].append({
-            "stage": "RUN", "status": "constructed", "at": self.ctx.clock.now(),
-            "artifacts": {key: runtime[key] for key in
-                          ("runtimeId", "did", "buildDigest", "manifestDigest",
-                           "verifiedTools", "status", "model")},
-        })
-        row["state"] = "agent_constructed"
+        if self._next_action(row) != 'deliver-agent':
+            raise ValueError('只有已接受 FINAL 且已发布的制品才能颁发到用户本地')
+        publication = self.ctx.agent.get(f"/v1/tpaa/publications/{row['recordId']}")
+        final = next(e['artifacts'] for e in reversed(row['events'])
+                     if e['stage'] == 'FINAL' and e['status'] == 'user_accepted')
+        pub = next(e['artifacts'] for e in reversed(row['events']) if e['stage'] == 'PUB')
+        if (publication['owner'] != owner or publication['recordId'] != row['recordId']
+                or publication['did'] != final['did'] or publication['did'] != pub['did']
+                or publication['phcDigest'] != final['phcDigest']
+                or publication['buildDigest'] != pub['buildDigest']):
+            raise Forbidden('颁发制品不属于本申请最终凭证')
+        delivered = self._executor(owner).deliver_agent(
+            row['executorLabel'], publication, owner=owner, application_id=app_id)
+        if (delivered['did'] != final['did'] or delivered['phcDigest'] != final['phcDigest']
+                or delivered['buildDigest'] != pub['buildDigest']):
+            raise Forbidden('用户端智能体颁发回执与申请不一致')
+        row['events'].append({'stage': 'DELIVER', 'status': 'delivered_local',
+                              'at': self.ctx.clock.now(), 'artifacts': delivered})
+        row['state'] = 'agent_delivered'
         self._save(row)
         return self.timeline(owner, app_id)
+
+    def start_runtime(self, owner: str, app_id: str) -> dict:
+        row = self._row(owner, app_id)
+        if row['state'] != 'agent_delivered':
+            raise ValueError('必须先将已验证智能体颁发到用户本地')
+        receipt = self._executor(owner).agent_receipt(
+            row['executorLabel'], owner=owner, application_id=app_id)
+        final = next(e['artifacts'] for e in reversed(row['events'])
+                     if e['stage'] == 'FINAL' and e['status'] == 'user_accepted')
+        pub = next(e['artifacts'] for e in reversed(row['events']) if e['stage'] == 'PUB')
+        if (receipt['did'] != final['did'] or receipt['phcDigest'] != final['phcDigest']
+                or receipt['buildDigest'] != pub['buildDigest']):
+            raise Forbidden('本地智能体颁发回执与申请不一致')
+        row['events'].append({'stage': 'RUN', 'status': 'ready_local',
+                              'at': self.ctx.clock.now(), 'artifacts': {
+                                  'did': receipt['did'], 'localPath': receipt['localPath'],
+                                  'buildDigest': receipt['buildDigest'],
+                                  'model': 'configured-on-user-device',
+                                  'executionLocation': 'local-user-executor'}})
+        row['state'] = 'agent_constructed'
+        self._save(row)
+        return self.timeline(owner, app_id)
+
+    def chat_runtime(self, owner: str, app_id: str, text: str) -> dict:
+        row = self._row(owner, app_id)
+        if row['state'] != 'agent_constructed':
+            raise ValueError('请先从最终 PHC 颁发本地智能体')
+        final = next(e['artifacts'] for e in reversed(row['events'])
+                     if e['stage'] == 'FINAL' and e['status'] == 'user_accepted')
+        receipt = self._executor(owner).agent_receipt(
+            row['executorLabel'], owner=owner, application_id=app_id)
+        if receipt['did'] != final['did'] or receipt['phcDigest'] != final['phcDigest']:
+            raise Forbidden('本地智能体与最终凭证不一致')
+        return self._executor(owner).local_chat(
+            row['executorLabel'], text, owner=owner, application_id=app_id)
 
     def _save(self, row: dict) -> None:
         def update(data):
@@ -826,6 +888,10 @@ def create_app(*, ctx: PortalContext) -> FastAPI:
                    "finalize-d6": lambda: desk.finalize_d6(who["sub"], app_id),
                    "verify-final": lambda: desk.verify_final(who["sub"], app_id),
                    "accept-final": lambda: desk.accept_final(who["sub"], app_id),
+                   "publish": lambda: desk.publish(who["sub"], app_id),
+                   "deliver-agent": lambda: desk.deliver_agent(who["sub"], app_id),
+                   "start-runtime": lambda: desk.start_runtime(who["sub"], app_id),
+                   "chat-runtime": lambda: desk.chat_runtime(who["sub"], app_id, body.get('text', '')),
                    "reconcile": lambda: desk.reconcile(who["sub"], app_id)}
         if action not in actions:
             raise NotFound(f"不支持的流程动作：{action}")

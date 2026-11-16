@@ -12,7 +12,6 @@ TP 记录（TpRecord）里有 r_bind' / r_tp —— 原文 G3 的"本地数据�
 from __future__ import annotations
 
 import crypto.sdk
-from crypto.tpaa_v1.wire import unb64u
 
 from services.shared.v1_http import Conflict, Forbidden, NotFound
 
@@ -113,7 +112,7 @@ class PhcDesk:
             raise Conflict("凭证尚未完成 D6，当前没有 SCID 可解密")
         try:
             encoded = rec.did.split(":")[2]
-            cscid = unb64u(encoded)
+            cscid = v1.unb64u(encoded)
             opened = self.ctx.tp_hsm.pke_open(cscid, tag="CSCID")
         except (IndexError, ValueError, TypeError) as exc:
             raise Conflict("DID 中的 SCID 格式无效，无法解密") from exc

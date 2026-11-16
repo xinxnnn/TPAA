@@ -62,6 +62,7 @@ button:disabled { opacity:.54; cursor:not-allowed; }
 .step-marker { width:37px; height:37px; z-index:1; border:1px solid var(--line); background:#f6faf8; border-radius:50%; display:grid; place-items:center; color:#84958f; font:700 11px ui-monospace,monospace; }
 .has-event .step-marker { background:var(--soft); border-color:#b5dace; color:var(--teal); font-size:15px; }
 .is-active .step-marker { background:var(--teal); border-color:var(--teal); color:#fff; }
+.is-failed .step-marker { background:#fff0ed; border-color:#e3b4aa; color:#a43f31; }
 .step-body { min-width:0; padding:3px 0 0; }
 .step-heading { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; }
 .step-heading > div { display:flex; align-items:baseline; flex-wrap:wrap; gap:11px; min-width:0; }

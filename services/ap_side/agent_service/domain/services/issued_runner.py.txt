@@ -1,0 +1,95 @@
+"""Issued TPAA personal AG2 agent.
+
+Run with: python -P run.py --executor-state-root PATH --project-root PATH --prompt "hello"
+Requires the TPAA verifier, AG2, and user-local model environment settings.
+The issued bundle is verified but not executed until capability adapters exist.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+# -P prevents imports from the issued directory while keeping installed AG2
+# and its user-site dependencies available. The project root is explicit.
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Locally issued TPAA AG2 agent")
+    parser.add_argument("--executor-state-root", type=Path,
+                        default=os.environ.get("TPAA_EXECUTOR_STATE_ROOT"))
+    parser.add_argument("--user-key-seed", type=Path,
+                        help="test-adapter USER key seed if the executor used an injected test HSM")
+    parser.add_argument("--project-root", type=Path, default=os.environ.get("TPAA_PROJECT_ROOT"),
+                        help="directory containing the TPAA verifier and runtime")
+    parser.add_argument("--agent-root", type=Path, default=os.environ.get("TPAA_LOCAL_AGENT_ROOT"),
+                        help="localstore directory containing the delivered agent")
+    parser.add_argument("--check", action="store_true", help="Verify issued files without running")
+    parser.add_argument("--prompt", help="One local test conversation turn")
+    args = parser.parse_args()
+    if not args.executor_state_root:
+        parser.error("set --executor-state-root (user-side executor state directory)")
+    if not args.project_root:
+        parser.error("set --project-root (TPAA project directory)")
+    project = args.project_root.resolve()
+    if not (project / "crypto" / "sdk" / "v1.py").is_file():
+        parser.error("--project-root does not contain the TPAA runtime")
+    root = (args.agent_root or project / "localstore").resolve()
+    sys.path.insert(0, str(project))
+    if not args.check and (not args.prompt or not args.prompt.strip()):
+        parser.error("provide --prompt or --check")
+
+    from user_credential_handler import UserCredentialHandler
+    from localstore.delivery import load
+    import crypto.sdk
+    import json
+    v1 = crypto.sdk.v1
+
+    if args.user_key_seed:
+        seed = json.loads(args.user_key_seed.read_text(encoding="utf-8"))
+        user_hsm = v1.hsm_from_seed(domain="USER", seed=seed)
+        handler = UserCredentialHandler(args.executor_state_root, hsm=user_hsm, agent_root=root)
+    else:
+        handler = UserCredentialHandler(args.executor_state_root, agent_root=root)
+    state = handler.store.load()
+    application_id = Path(__file__).resolve().parents[1] / "delivery.json"
+    binding = json.loads(application_id.read_text(encoding="utf-8"))
+    app_id = binding["applicationId"]
+    labels = [label for label, entry in state.items()
+              if isinstance(entry, dict) and entry.get("applicationId") == app_id
+              and entry.get("stage") == "final"]
+    if len(labels) != 1:
+        raise SystemExit("Exactly one accepted local credential is required for this agent")
+    entry = state[labels[0]]
+    tp_pk = v1.pk_from_hex(entry["tpKeys"]["signPk"])
+    ap_pk = v1.pk_from_hex(entry["apKeys"]["signPk"])
+    issued = load(root, app_id, tp_pk=tp_pk, ap_pk=ap_pk)
+    from localstore.delivery import directory
+    if Path(__file__).resolve() != (directory(root, app_id) / "files" / "run.py").resolve():
+        raise SystemExit("Runner must be launched from its issued directory")
+    if (issued["binding"]["owner"] != handler.owner or
+            issued["binding"]["did"] != entry["did"] or
+            issued["binding"]["applicationId"] != app_id or
+            v1.phc_digest(v1.from_jsonld(issued["phc"])) !=
+            v1.phc_digest(v1.from_jsonld(entry["phc"]))):
+        raise SystemExit("Issued agent does not match this user's accepted credential")
+    if args.check:
+        print("Verified local agent:", app_id)
+        return
+
+    try:
+        from packages.tpaa_runtime.local_agent import run
+    except ImportError as exc:
+        raise SystemExit('Install the AG2 runtime dependency: pip install "ag2[openai]==1.2.2"') from exc
+
+    answer = asyncio.run(run(issued["publication"], issued["phc"], owner=handler.owner,
+                             user_hsm=handler.hsm, tp_pk=tp_pk, ap_pk=ap_pk,
+                             prompt=args.prompt, application_id=app_id,
+                             agent_dir=directory(root, app_id)))
+    print(answer)
+
+
+if __name__ == "__main__":
+    main()

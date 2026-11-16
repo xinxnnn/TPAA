@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from tpaa_v1_protocol import A, PII, T, shared, sup_key, v1  # noqa: E402
+from crypto.tpaa_v1.pke import seal
 
 
 def test_g4_wallet_holds_verified_initial_phc() -> None:
@@ -26,6 +28,37 @@ def test_d5_user_recomputed_cmi_and_af() -> None:
     assert r.verified.cmi == phc1.apm.cmi == r.arec.cmi
     assert r.verified.cred.af.holds(r.pending.hid)
     assert r.verified.cred.af.af == r.pending.af.af, "算法1 的 CCH 不改变 AF 取值"
+
+
+def test_modules_are_signed_and_preserved_in_final_phc():
+    r = shared()
+    modules = r.verified.pa["modules"]
+    assert r.cred.phc["ASO"]["APM"]["Modules"] == []
+    assert r.verified.phc1["ASO"]["APM"]["Modules"] == modules
+    assert r.phc2["ASO"]["APM"]["Modules"] == modules
+    for change in ("content", "order", "remove"):
+        modified = deepcopy(r.phc2)
+        apm = modified["ASO"]["APM"]
+        if change == "content":
+            apm["Modules"][0]["digest"] = "00" * 32
+        elif change == "order":
+            apm["Modules"].reverse()
+        else:
+            del apm["Modules"]
+        assert "APproof 无效" in v1.verify_public(v1.from_jsonld(modified), **_pk(r))
+
+
+def test_d5_rejects_pa_module_list_different_from_signed_phc():
+    r = shared()
+    par = r.p.user.pke_open(r.par, tag="PAR")
+    par["PA"]["modules"][0]["digest"] = "00" * 32
+    box = seal(r.p.user.enc_pub(), par, tag="PAR")
+    try:
+        v1.user.d5_accept_par(user_hsm=r.p.user, par_box=box, cred=r.cred, **r.p.keys)
+    except v1.ProtocolError as exc:
+        assert "模块清单" in str(exc)
+    else:
+        raise AssertionError("必须拒绝与 PHC 不一致的模块清单")
 
 
 def test_d6_did_structure_and_cdid_is_ciphertext() -> None:

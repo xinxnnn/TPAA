@@ -32,6 +32,10 @@ class ExecutorHttpClient:
                 message = payload.get("detail") or payload.get("message") or "executor request failed"
             except (ValueError, UnicodeDecodeError):
                 message = "executor request failed"
+            if exc.code == 400:
+                raise ValueError(message) from exc
+            if exc.code == 403:
+                raise PermissionError(message) from exc
             raise RuntimeError(f"user executor returned HTTP {exc.code}: {message}") from exc
         except (TimeoutError, URLError) as exc:
             raise RuntimeError("user executor unavailable") from exc
@@ -64,7 +68,8 @@ class ExecutorHttpClient:
 
     # 改状态的操作：服务端要求 requestId 并按它做幂等。
     MUTATING = {"set-application", "accept-rr", "accept-g4", "build-ar", "open-cmm",
-                "build-paci", "accept-par", "build-didgr", "verify-final", "accept-final"}
+                "build-paci", "accept-par", "build-didgr", "verify-final", "accept-final",
+                "deliver-agent"}
 
     def _request_id(self, operation: str, label: str, application_id: str | None) -> str:
         """稳定派生，而不是每次随机。
@@ -155,6 +160,19 @@ class ExecutorHttpClient:
         return self._call("credential", label, owner=owner,
                           application_id=application_id or self._application(label, owner))
 
+    def deliver_agent(self, label: str, publication: dict, *, owner: str,
+                      application_id: str) -> dict:
+        return self._call("deliver-agent", label, owner=owner,
+                          application_id=application_id, publication=publication)
+
+    def agent_receipt(self, label: str, *, owner: str, application_id: str) -> dict:
+        return self._call("agent-receipt", label, owner=owner,
+                          application_id=application_id)
+
+    def local_chat(self, label: str, text: str, *, owner: str, application_id: str) -> dict:
+        return self._call("local-chat", label, owner=owner,
+                          application_id=application_id, text=text)
+
     def application_id(self, label: str) -> str | None:
         value = self._request("GET", f"/v1/executor/{label}/application")
         app_id = value.get("applicationId")
@@ -181,6 +199,10 @@ class _TestExecutorHttpClient(ExecutorHttpClient):
         if response.status_code >= 400:
             payload = response.json()
             message = payload.get("detail") or payload.get("message") or "executor request failed"
+            if response.status_code == 400:
+                raise ValueError(message)
+            if response.status_code == 403:
+                raise PermissionError(message)
             raise RuntimeError(f"user executor returned HTTP {response.status_code}: {message}")
         return response.json()
 

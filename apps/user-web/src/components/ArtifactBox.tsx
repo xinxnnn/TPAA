@@ -97,9 +97,14 @@ export function ArtifactBox({ event, applicationId, decryptedPreview }: Props) {
   const [scidError, setScidError] = useState('')
   const artifacts = event.artifacts ?? {}
   const safe = safeArtifacts(artifacts)
-  const { phc, cmi, modules, did, arEnvelope, crEnvelope, rrEnvelope, paciEnvelope,
+  const { phc, cmi: eventCmi, modules: eventModules, did, arEnvelope, crEnvelope, rrEnvelope, paciEnvelope,
     par, didgrEnvelope, finalEnvelope, hashCalculations, ...otherArtifacts } = safe
   const hasPhc = phc !== undefined && phc !== null
+  type PhcAso = { APM?: { CMI?: unknown; Modules?: unknown } }
+  const phcDocument = phc as { ASO?: PhcAso; agentSelfOwned?: PhcAso } | undefined
+  const apm = (phcDocument?.ASO ?? phcDocument?.agentSelfOwned)?.APM
+  const cmi = apm?.CMI ?? eventCmi
+  const modules = apm?.Modules ?? eventModules
   const moduleList = Array.isArray(modules) ? modules : []
   const didValue = typeof did === 'string' ? did : ''
   const didParts = didValue.startsWith('did:wba:') ? didValue.split(':') : []
@@ -164,7 +169,7 @@ export function ArtifactBox({ event, applicationId, decryptedPreview }: Props) {
       <code className="artifact-value">{didValue}</code>
       {didParts.length >= 5 ? <dl className="artifact-fields">
         <div><dt>方法</dt><dd>did:wba</dd></div>
-        <div><dt>SCID（Base64URL 编码的 CSCID 密文）</dt><dd><pre>{didParts[2]}</pre></dd></div>
+        <div><dt>CSCID（密文的 Base64URL 编码）</dt><dd><pre>{didParts[2]}</pre></dd></div>
         <div><dt>域名 / 路径段</dt><dd><pre>{didParts.slice(3).join(':')}</pre></dd></div>
       </dl> : <p>该 DID 使用的格式不是 did:wba，以上展示原始标识。</p>}
       {didParts.length >= 5 && <>
@@ -192,6 +197,7 @@ export function ArtifactBox({ event, applicationId, decryptedPreview }: Props) {
       previewButton('查看用户端验证后的 RR 结果', decryptedPreview)}
     {typeof cmi === 'string' && <details className="artifact-section cmi-section">
       <summary>CMI（能力配置摘要）和模块输入</summary>
+      {apm?.Modules !== undefined && <p>模块清单来自 PHC 的 ASO.APM.Modules，与 CMI 一并纳入 AP 签名。</p>}
       <p>实际计算：先以 H(ID) 得到链起点，再按下列顺序逐个输入模块 ID、版本和内容摘要，最后得到 CMI。用户端在 D5 会独立重算并比对 PHC′.ASO.APM.CMI。</p>
       {typeof artifacts.cmiAlgorithm === 'string' && <p className="artifact-note">{artifacts.cmiAlgorithm}</p>}
       {typeof artifacts.cmiInputOrder === 'string' && <p className="artifact-note">{artifacts.cmiInputOrder}</p>}
