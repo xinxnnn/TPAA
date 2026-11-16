@@ -150,7 +150,7 @@ def test_phc_jsonld_roundtrip_and_no_randomness_fields() -> None:
     assert doc["@context"] == v1.JSONLD_CONTEXT
     assert set(doc["ASO"]) == {"TPM", "APM"}
     assert set(doc["ASO"]["TPM"]) == {"Time", "CDID", "AF", "ECID"}
-    assert set(doc["ASO"]["APM"]) == {"Time", "CMI", "AFRef"}
+    assert set(doc["ASO"]["APM"]) == {"Time", "CMI", "AFRef", "Modules"}
     assert set(doc["TPA"]) == {"TPid", "TPproof"}
     assert set(doc["APA"]) == {"APid", "APproof"}
     assert set(doc["PROOF"]) == {"TPCH", "APCH", "CHproof", "VM"}
@@ -168,7 +168,7 @@ def test_phc_fields_and_proofs_follow_g3_d4_d6_ownership():
     assert set(initial) == {"@context", "profile", "version", "ASO", "TPA", "APA", "PROOF"}
     assert tpm0 == {"Time": f.issued.phc.tpm.time, "CDID": "",
                     "AF": format(f.af_g2.af, "x"), "ECID": f.issued.phc.tpm.ecid}
-    assert apm0 == {"Time": "", "CMI": "", "AFRef": ""}
+    assert apm0 == {"Time": "", "CMI": "", "AFRef": "", "Modules": []}
     assert initial["TPA"] == {"TPid": f.issued.phc.tpid.hex(),
                               "TPproof": f.issued.phc.tpproof.hex()}
     assert initial["APA"] == {"APid": f.issued.phc.apid.hex(), "APproof": ""}
@@ -183,6 +183,7 @@ def test_phc_fields_and_proofs_follow_g3_d4_d6_ownership():
     assert updated_ap["ASO"]["APM"] == {
         "Time": f.phc_d4.apm.time, "CMI": f.cmi,
         "AFRef": v1.af_ref(f.af_g2.af),
+        "Modules": [{"moduleId": m, "version": v, "digest": d} for m, v, d in MODULES],
     }
     assert updated_ap["TPA"] == initial["TPA"]
     assert updated_ap["PROOF"] == initial["PROOF"]
@@ -215,6 +216,25 @@ def test_legacy_phc_jsonld_roundtrips_without_changing_digest():
 
     assert v1.to_jsonld(decoded) == legacy
     assert v1.phc_digest(decoded) == v1.json_digest(legacy)
+
+
+def test_historical_phc_without_modules_keeps_signed_encoding():
+    from dataclasses import replace
+
+    f = _flow()
+    old = replace(f.issued.phc, apm=replace(f.issued.phc.apm, modules=None))
+    old.apch = f.ap.public_chameleon().compute(old.apch_msg(), f.issued.r_ap)
+    old.chproof = f.tp.sign(old.chproof_msg()).to_bytes()
+    updated, opening = v1.algorithm1(old, ap_hsm=f.ap, r_ap=f.issued.r_ap,
+                                    cmi=f.cmi, time="historical")
+    document = v1.to_jsonld(updated)
+    assert "Modules" not in document["ASO"]["APM"]
+    decoded = v1.from_jsonld(document)
+    assert v1.to_jsonld(decoded) == document
+    assert decoded.approof_msg() == updated.approof_msg()
+    assert v1.verify_public(decoded, **pub_keys(f)) == []
+    assert v1.verify_holder(decoded, **pub_keys(f), tp_ch=f.tp.public_chameleon(),
+                            ap_ch=f.ap.public_chameleon(), r_ap=opening) == []
 
 
 def test_from_jsonld_rejects_mixed_or_incomplete_phc_layout():

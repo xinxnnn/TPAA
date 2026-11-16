@@ -165,6 +165,8 @@ $config.psobject.Properties | ForEach-Object {
 }
 $env:PYTHONPATH = $repo
 $env:TPAA_EXECUTOR_STATE_ROOT = Join-Path $StateRoot 'executor'
+$env:TPAA_LOCAL_AGENT_ROOT = Join-Path $repo 'localstore'
+$env:TPAA_PROJECT_ROOT = $repo
 $env:TPAA_EXECUTOR_BIND = '127.0.0.1'
 $env:TPAA_EXECUTOR_URL = 'http://127.0.0.1:8110'
 $env:TPAA_LOCAL_TEST_STACK = '1'

@@ -9,6 +9,8 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
+# Isolated academic pairing backend; TPAA's default install remains dependency-free.
+memauth = ["py-ecc==8.0.0", "pycryptodome==3.23.0"]
 # 后续接入 AG2 运行时与后端服务时才需要
 runtime = ["ag2[openai]>=1.1.2"]
 

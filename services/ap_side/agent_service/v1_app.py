@@ -16,6 +16,8 @@ CMM 由 localstore 模块仓库生成：每个模块是一个功能类别，未�
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import secrets
 from dataclasses import dataclass, field
 
@@ -87,8 +89,15 @@ class AgentV1Desk:
         return {"version": "cmm-" + _digest(body)[:16], **body}
 
     def resolve(self, selection: list[dict]) -> list[tuple[str, str, str]]:
+        # Match the CMM order, independent of checkbox/caller order.
+        order = {(category["id"], version): (i, j)
+                 for i, category in enumerate(self.catalog()["categories"])
+                 for j, version in enumerate(category["options"])}
+        keys = [(item["moduleId"], item["version"]) for item in selection]
+        if len(set(keys)) != len(keys) or any(key not in order for key in keys):
+            raise v1.ProtocolError("选择包含重复或 CMM 未提供的模块版本")
         out = []
-        for item in selection:
+        for item in sorted(selection, key=lambda item: order[(item["moduleId"], item["version"])]):
             mid, ver = item["moduleId"], item["version"]
             try:
                 e = self.ctx.modules.get_entry(mid, ver)
@@ -433,12 +442,64 @@ class AgentV1Desk:
         runtime_id = "runtime-" + secrets.token_hex(10)
         c.runtime_agents[runtime_id] = {"agent": agent, "identity": identity,
                                        "gateway": gateway, "trust": trust,
-                                       "guardLog": guard_log}
+                                       "guardLog": guard_log, "owner": caller,
+                                       "recordId": record_id, "memoryEvents": [],
+                                       "chatLock": asyncio.Lock(),
+                                       "platformBinding": {
+                                           "applicationSource": "tpaa-final-publication",
+                                           "did": did, "phcDigest": publication["phcDigest"],
+                                           "cmi": rec.cmi, "manifestDigest": manifest.digest(),
+                                           "memauthStatus": "not-enrolled"}}
         return {"runtimeId": runtime_id, "did": did,
                 "buildDigest": publication["buildDigest"],
                 "manifestDigest": manifest.digest(),
                 "verifiedTools": [item.id for item in manifest.tools],
                 "status": "agent_constructed", "model": "ag2.testing.TestConfig"}
+
+    def runtime_status(self, runtime_id: str, *, caller: str) -> dict:
+        runtime = self.ctx.runtime_agents.get(runtime_id)
+        if runtime is None:
+            raise NotFound('Runtime 不存在或进程已重启，请重新构造')
+        if runtime['owner'] != caller:
+            raise Forbidden('只能访问自己的平台智能体')
+        runtime['trust'].status.check(runtime['identity'].did)
+        status = ('expired' if runtime['identity'].card.attestation.body['exp'] <= self.ctx.clock.now()
+                  else 'active')
+        return {'runtimeId': runtime_id, 'recordId': runtime['recordId'],
+                'did': runtime['identity'].did,
+                'phcDigest': runtime['platformBinding']['phcDigest'],
+                'manifestDigest': runtime['platformBinding']['manifestDigest'],
+                'status': status}
+
+    def retire_runtime(self, runtime_id: str, *, caller: str) -> dict:
+        self.runtime_status(runtime_id, caller=caller)
+        del self.ctx.runtime_agents[runtime_id]
+        return {'runtimeId': runtime_id, 'status': 'retired'}
+
+    async def runtime_chat(self, runtime_id: str, text: str, *, caller: str) -> dict:
+        runtime = self.ctx.runtime_agents.get(runtime_id)
+        if runtime is None:
+            raise NotFound('Runtime 不存在或进程已重启，请重新构造')
+        if runtime['owner'] != caller:
+            raise Forbidden('只能调用自己的平台智能体')
+        if type(text) is not str or not text.strip() or len(text) > 8000:
+            raise ValueError('请输入不超过 8000 字符的实验任务')
+        runtime['trust'].status.check(runtime['identity'].did)
+        if runtime['identity'].card.attestation.body['exp'] <= self.ctx.clock.now():
+            raise Forbidden('运行证明已过期，请重新构造')
+        async with runtime['chatLock']:
+            result = await runtime['agent'].ask(text)
+            answer = str(result.body or '')
+            # Only digests enter the event buffer; it is bounded and process-local.
+            events = [{'eventId': 'event-' + secrets.token_hex(16),
+                       'time': str(self.ctx.clock.now()), 'action': action,
+                       'object': 'sha256:' + hashlib.sha256(content.encode('utf-8')).hexdigest(),
+                       'subject': runtime['identity'].did, 'method': 'ag2.ask/platform-runtime'}
+                      for action, content in (('task_received', text), ('agent_response', answer))]
+            runtime['memoryEvents'] = (runtime['memoryEvents'] + events)[-200:]
+        return {'runtimeId': runtime_id, 'answer': answer,
+                'platformBinding': runtime['platformBinding'], 'memoryEvents': events,
+                'model': 'ag2.testing.TestConfig', 'memauthStatus': 'not-enrolled'}
 
     def publication(self, record_id: str, *, caller: str) -> dict:
         p = self.ctx.store.load().get("publications", {}).get(record_id)
@@ -545,6 +606,18 @@ def create_app(*, ctx: AgentV1Context, auth) -> FastAPI:
                       who: dict = guard.require("user")):
         return desk.start_runtime(record_id, did=body.get("did", ""),
                                   phc_doc=body.get("phc", {}), caller=who["sub"])
+
+    @app.get('/v1/tpaa/runtimes/{runtime_id}')
+    def runtime_status(runtime_id: str, who: dict = guard.require('user')):
+        return desk.runtime_status(runtime_id, caller=who['sub'])
+
+    @app.post('/v1/tpaa/runtimes/{runtime_id}/retire')
+    def retire_runtime(runtime_id: str, who: dict = guard.require('user')):
+        return desk.retire_runtime(runtime_id, caller=who['sub'])
+
+    @app.post('/v1/tpaa/runtimes/{runtime_id}/chat')
+    async def runtime_chat(runtime_id: str, body: dict = Body(...), who: dict = guard.require('user')):
+        return await desk.runtime_chat(runtime_id, body.get('text', ''), caller=who['sub'])
 
     return app
 

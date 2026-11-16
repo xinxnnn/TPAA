@@ -19,6 +19,7 @@ dist/
 !.env.example
 .tpaa-local-check/
 local-config.json
+/localstore/agent/
 staff-hsms.json
 *-seed.json
 *seed*.json

@@ -1,12 +1,14 @@
 """PHC v1 结构 —— 对外 JSON-LD 使用说明书图示的 ASO / TPA / APA / PROOF。
 
     ASO.TPM   Time / CDID / AF / ECID              仅 TP 写
-    ASO.APM   Time / CMI / AFRef                   仅 AP 写
+    ASO.APM   Time / CMI / AFRef / Modules         仅 AP 写
     TPA       TPid / TPproof = Sign_tp(TPM, TPid)
     APA       APid / APproof = Sign_ap(APM, APid)
     PROOF     TPCH / APCH / CHproof / VM
 
 与表 1 的差别（errata）：
+    + APM.Modules           有序模块 ID / 版本 / SHA-256 摘要，纳入 APproof。
+                            旧凭证缺此字段时保持原有签名编码，不自动补写。
     + profile / version      区分 tpaa_v1 与 proto0（E-profile）
     + APM.AFRef = H(AF)      N2：防拼接。第三方没有 r，算不了 TPCH/APCH，
                              CHproof 对他只是"签了两个数"。没有 AFRef 时，
@@ -20,6 +22,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 
 from .encoding import digest, encode, h_int
 from ..primitives.group import N
@@ -44,6 +47,7 @@ class APM:
     time: str = ""
     cmi: str = ""
     af_ref: str = ""          # hex(H(AF))
+    modules: list[dict] | None = None  # None preserves historical signed messages.
 
 
 @dataclass
@@ -67,7 +71,11 @@ class PHCv1:
 
     def approof_msg(self) -> bytes:
         a = self.apm
-        return encode("APproof", a.time, a.cmi, a.af_ref, self.apid)
+        fields = (a.time, a.cmi, a.af_ref, self.apid)
+        if a.modules is not None:
+            fields += (json.dumps(a.modules, sort_keys=True, separators=(",", ":"),
+                                  ensure_ascii=False).encode("utf-8"),)
+        return encode("APproof", *fields)
 
     def tpch_msg(self) -> int:
         return h_int("TPCH", self.tpproof_msg(), self.tpproof, mod=N)
@@ -90,6 +98,9 @@ def _require_keys(value: object, expected: set[str], what: str) -> dict:
 
 
 def to_jsonld(phc: PHCv1) -> dict:
+    apm = {"Time": phc.apm.time, "CMI": phc.apm.cmi, "AFRef": phc.apm.af_ref}
+    if phc.apm.modules is not None:
+        apm["Modules"] = [dict(module) for module in phc.apm.modules]
     if phc.wire_schema == _LEGACY_SCHEMA:
         return {
             "@context": CONTEXT,
@@ -98,7 +109,7 @@ def to_jsonld(phc: PHCv1) -> dict:
             "agentSelfOwned": {
                 "TPM": {"Time": phc.tpm.time, "CDID": phc.tpm.cdid,
                         "AF": format(phc.tpm.af, "x"), "ECID": phc.tpm.ecid},
-                "APM": {"Time": phc.apm.time, "CMI": phc.apm.cmi, "AFRef": phc.apm.af_ref},
+                "APM": apm,
             },
             "tpAttestation": {"TPid": phc.tpid.hex(), "TPproof": phc.tpproof.hex()},
             "apAttestation": {"APid": phc.apid.hex(), "APproof": phc.approof.hex()},
@@ -112,7 +123,7 @@ def to_jsonld(phc: PHCv1) -> dict:
         "ASO": {
             "TPM": {"Time": phc.tpm.time, "CDID": phc.tpm.cdid,
                     "AF": format(phc.tpm.af, "x"), "ECID": phc.tpm.ecid},
-            "APM": {"Time": phc.apm.time, "CMI": phc.apm.cmi, "AFRef": phc.apm.af_ref},
+            "APM": apm,
         },
         "TPA": {"TPid": phc.tpid.hex(), "TPproof": phc.tpproof.hex()},
         "APA": {"APid": phc.apid.hex(), "APproof": phc.approof.hex()},
@@ -148,7 +159,29 @@ def from_jsonld(d: dict) -> PHCv1:
         wire_schema = _LEGACY_SCHEMA
     aso = _require_keys(aso, {"TPM", "APM"}, "ASO")
     t = _require_keys(aso["TPM"], {"Time", "CDID", "AF", "ECID"}, "ASO.TPM")
-    a = _require_keys(aso["APM"], {"Time", "CMI", "AFRef"}, "ASO.APM")
+    apm_keys = {"Time", "CMI", "AFRef"}
+    if isinstance(aso["APM"], dict) and "Modules" in aso["APM"]:
+        apm_keys.add("Modules")
+    a = _require_keys(aso["APM"], apm_keys, "ASO.APM")
+    modules = None
+    if "Modules" in a:
+        if not isinstance(a["Modules"], list):
+            raise ValueError("ASO.APM.Modules 必须是模块清单")
+        modules = []
+        seen = set()
+        for item in a["Modules"]:
+            item = _require_keys(item, {"moduleId", "version", "digest"}, "ASO.APM.Modules[]")
+            if any(not isinstance(item[key], str) or not item[key] for key in item):
+                raise ValueError("模块 ID、版本与摘要必须是非空字符串")
+            if len(item["digest"]) != 64 or any(c not in "0123456789abcdef" for c in item["digest"]):
+                raise ValueError("模块摘要必须是小写 SHA-256 十六进制字符串")
+            key = (item["moduleId"], item["version"])
+            if key in seen:
+                raise ValueError("PHC 模块清单包含重复模块版本")
+            seen.add(key)
+            modules.append(dict(item))
+        if bool(a["CMI"]) != bool(modules):
+            raise ValueError("PHC 的 CMI 与模块清单必须同时为空或同时存在")
     tpa = _require_keys(tpa, {"TPid", "TPproof"}, "TPA")
     apa = _require_keys(apa, {"APid", "APproof"}, "APA")
     pf = _require_keys(pf, {"TPCH", "APCH", "CHproof", "VM"}, "PROOF")
@@ -157,7 +190,7 @@ def from_jsonld(d: dict) -> PHCv1:
     return PHCv1(
         version=int(d["version"]),
         tpm=TPM(time=t["Time"], cdid=t["CDID"], af=int(t["AF"], 16), ecid=t["ECID"]),
-        apm=APM(time=a["Time"], cmi=a["CMI"], af_ref=a["AFRef"]),
+        apm=APM(time=a["Time"], cmi=a["CMI"], af_ref=a["AFRef"], modules=modules),
         tpid=bytes.fromhex(tpa["TPid"]), tpproof=bytes.fromhex(tpa["TPproof"]),
         apid=bytes.fromhex(apa["APid"]), approof=bytes.fromhex(apa["APproof"]),
         tpch=int(pf["TPCH"], 16), apch=int(pf["APCH"], 16),

@@ -227,6 +227,8 @@ def tp_finalize(*, tp_hsm, didgr_box: dict, rec: TpRecord, sup_pub, tp_sign_pk, 
         raise ProtocolError("D4Statement 绑定的不是这条记录的 AF")
     if st["cmi"] != phc1.apm.cmi:
         raise ProtocolError("D4Statement 的 CMI 与 PHC' 中的 CMI 不一致")
+    if phc1.apm.modules is not None and st["modulesDigest"] != json_digest(phc1.apm.modules):
+        raise ProtocolError("D4Statement 的模块摘要与 PHC' 中的能力模块清单不一致")
     if st["phcDigest"] != phc_digest(phc1):
         raise ProtocolError("D4Statement 绑定的不是这份 PHC'")
     if g.get("domain2") != st["domain2"]:

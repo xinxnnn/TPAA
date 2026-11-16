@@ -23,7 +23,7 @@ from ..tpaa_v1.supervision import (
 from ..tpaa_v1 import proto_ap as ap, proto_tp as tp, proto_user as user  # noqa: E402
 from ..tpaa_v1 import auth, case, identity_evidence, initialization, records  # noqa: E402
 from ..tpaa_v1.pke import PkeError  # noqa: E402
-from ..tpaa_v1.wire import ProtocolError, hid_of, owner_of, pk_from_hex, pk_hex  # noqa: E402
+from ..tpaa_v1.wire import ProtocolError, hid_of, owner_of, pk_from_hex, pk_hex, unb64u  # noqa: E402
 # 运行时可信层（packages/tpaa_runtime/trust.py）用：域分离签名 / 验签 / 规范化摘要
 from ..tpaa_v1.wire import check_sig, json_digest, phc_digest, sign  # noqa: E402
 
@@ -72,6 +72,6 @@ __all__ = [
     "compute_irf", "compute_s_ap", "compute_rf", "reveal_hid",
     "seal_ecid", "ecid_mask", "open_ecid",
     "user", "tp", "ap", "auth", "case", "identity_evidence", "initialization", "records", "ProtocolError", "PkeError", "hid_of", "owner_of",
-    "pk_hex", "pk_from_hex", "new_hsm_seed", "hsm_from_seed",
+    "pk_hex", "pk_from_hex", "unb64u", "new_hsm_seed", "hsm_from_seed",
     "sign", "check_sig", "json_digest", "phc_digest",
 ]

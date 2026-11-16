@@ -101,7 +101,7 @@ def issue_phc(*, tp_hsm, ap_ch: PublicChameleon, ap_pk, af: int,
     if callable(getattr(ap_ch, "has_trapdoor", None)) and ap_ch.has_trapdoor():
         raise PermissionError("红线 1：issue_phc 只收 AP 的公钥句柄")
     phc = PHCv1(tpm=TPM(time=time, cdid="", af=af, ecid=ecid),
-                apm=APM(), tpid=ser_point(tp_hsm.pubkey()), apid=ser_point(ap_pk))
+                apm=APM(modules=[]), tpid=ser_point(tp_hsm.pubkey()), apid=ser_point(ap_pk))
     phc.tpproof = tp_hsm.sign(phc.tpproof_msg()).to_bytes()
 
     tp_pub = tp_hsm.public_chameleon()
@@ -112,13 +112,20 @@ def issue_phc(*, tp_hsm, ap_ch: PublicChameleon, ap_pk, af: int,
     return Issued(phc=phc, r_tp=r_tp, r_ap=r_ap)
 
 
-def algorithm1(phc: PHCv1, *, ap_hsm, r_ap: int, cmi: str, time: str) -> tuple[PHCv1, int]:
+def algorithm1(phc: PHCv1, *, ap_hsm, r_ap: int, cmi: str, time: str,
+               modules: list[tuple[str, str, str]] | None = None) -> tuple[PHCv1, int]:
     """AP 写 APM，APCH 取值不变。返回 (PHC', r_ap')。"""
     _require(ap_hsm, "AP", "algorithm1")
     if ap_hsm.chameleon_compute(phc.apch_msg(), r_ap) != phc.apch:
         raise ValueError("r_ap 打不开这张凭证的 APCH —— 不是这张凭证的修改因子")
     old_m = phc.apch_msg()
-    out = replace(phc, apm=APM(time=time, cmi=cmi, af_ref=af_ref(phc.tpm.af)),
+    if modules is None and phc.apm.modules is not None:
+        raise ValueError("更新 PHC 能力时必须提供模块清单")
+    module_info = None if modules is None else [
+        {"moduleId": mid, "version": ver, "digest": dig} for mid, ver, dig in modules]
+    if module_info == []:
+        raise ValueError("能力模块清单不能为空")
+    out = replace(phc, apm=APM(time=time, cmi=cmi, af_ref=af_ref(phc.tpm.af), modules=module_info),
                   version=phc.version + 1)
     out.approof = ap_hsm.sign(out.approof_msg()).to_bytes()
     _, r_new = ap_hsm.chameleon_collide((old_m, r_ap), out.apch_msg())

@@ -8,6 +8,7 @@ USER HSM handle and use an independently controlled acceptance interface.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 from datetime import datetime
 from pathlib import Path
@@ -44,8 +45,9 @@ class UserCredentialHandler:
     # user-controlled signer, even when the server runs on the user's machine.
     user_controlled = False
 
-    def __init__(self, directory: str | Path, *, hsm=None) -> None:
+    def __init__(self, directory: str | Path, *, hsm=None, agent_root: str | Path | None = None) -> None:
         self.dir = Path(directory)
+        self.agent_root = Path(agent_root) if agent_root is not None else self.dir.parent / "localstore"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.hsm = hsm or self._load_or_create_hsm()
         self.store = _Store(self.dir / "state.json")
@@ -277,6 +279,50 @@ class UserCredentialHandler:
                 "stage": stage, "status": status, "at": now, "artifacts": artifacts})
             return data
         self.store.update(_upd)
+
+    async def local_agent(self, label: str, prompt: str, *, application_id: str) -> dict:
+        """Run local adapters with the user's signer and verified issued files."""
+        if type(prompt) is not str or not prompt.strip() or len(prompt) > 8000:
+            raise CredentialHandlerError("请输入不超过 8000 字符的本地任务")
+        entry = self._get(label, "final")
+        from localstore.delivery import directory, load
+        from packages.tpaa_runtime.local_agent import run
+
+        if entry["applicationId"] != application_id:
+            raise CredentialHandlerError("本地 Agent 与执行器绑定的申请不一致")
+        issued = load(self.agent_root, entry["applicationId"],
+                      tp_pk=self._pks(entry)["tp_sign_pk"], ap_pk=self._pks(entry)["ap_sign_pk"])
+        if issued["binding"]["did"] != entry["did"]:
+            raise CredentialHandlerError("本地 Agent DID 与用户凭证不一致")
+        answer = await run(issued["publication"], issued["phc"], owner=self.owner,
+                           user_hsm=self.hsm, tp_pk=self._pks(entry)["tp_sign_pk"],
+                           ap_pk=self._pks(entry)["ap_sign_pk"], prompt=prompt,
+                           application_id=application_id,
+                           agent_dir=directory(self.agent_root, application_id))
+        result = {"applicationId": entry["applicationId"], "did": entry["did"],
+                  "answer": answer, "model": os.environ['TPAA_AGENT_MODEL'],
+                  "executionLocation": "local-user-executor", "memauthStatus": "not-enrolled"}
+        self._event(label, "LOCAL_RUN", {k: v for k, v in result.items() if k != "answer"})
+        return result
+
+    def deliver_agent(self, label: str, publication: dict) -> dict:
+        """Accept AP's signed publication into this executor's local agent store."""
+        from localstore.delivery import deliver
+
+        entry = self._get(label, "final")
+        return deliver(self.agent_root, publication, entry["phc"],
+                       owner=self.owner, application_id=entry["applicationId"],
+                       did=entry["did"], record_id=publication["recordId"],
+                       tp_pk=self._pks(entry)["tp_sign_pk"],
+                       ap_pk=self._pks(entry)["ap_sign_pk"])
+
+    def agent_receipt(self, label: str) -> dict:
+        from localstore.delivery import receipt
+
+        entry = self._get(label, "final")
+        return receipt(self.agent_root, entry["applicationId"],
+                       tp_pk=self._pks(entry)["tp_sign_pk"],
+                       ap_pk=self._pks(entry)["ap_sign_pk"])
 
     def credential(self, label: str) -> dict:
         e = self._get(label, "final")

@@ -76,7 +76,7 @@ def run(*, tp=None, ap=None, hid: int = HID, owner: str = OWNER) -> Flow:
     # D4（AP）：CMI → 算法1 → AF 重绑 → s_ap / RF
     cmi = v1.hcgen(MODULES, hid)
     phc_d4, r_ap1 = v1.algorithm1(issued.phc, ap_hsm=ap, r_ap=issued.r_ap,
-                                  cmi=cmi, time="2026-10-14T10:05:00")
+                                  cmi=cmi, time="2026-10-14T10:05:00", modules=MODULES)
     af_d4 = v1.rebind_af(af_g2, hsm=ap, hid=hid, nonce=ap_nonce, owner=owner,
                          kind="CMI", value=cmi)
     s_ap = v1.compute_s_ap(ap, af_d4.af)

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 
 const MAX_PHOTO_BYTES = 64 * 1024
+const DEMO_BI_TEMPLATE = '<iris+fingerprint feature template>'
 
 type Props = {
   busy: boolean
@@ -19,7 +20,7 @@ function imageType(bytes: Uint8Array): 'jpeg' | 'png' | 'webp' | undefined {
 }
 
 export function IdentityForm({ busy, disabled, testAdapter = false, onSubmit }: Props) {
-  const [form, setForm] = useState({ name: '', id: '', nationalId: '', email: '', passport: '', biometric: '' })
+  const [form, setForm] = useState({ name: '', id: '', nationalId: '', email: '', passport: '' })
   const [photo, setPhoto] = useState<{ name: string; dataUrl: string }>()
   const [photoError, setPhotoError] = useState('')
   const photoInput = useRef<HTMLInputElement>(null)
@@ -59,12 +60,12 @@ export function IdentityForm({ busy, disabled, testAdapter = false, onSubmit }: 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim() || !form.id.trim() || !form.biometric.trim() || !photo) return
+    if (!form.name.trim() || !form.id.trim() || !photo) return
     const pii = { ID: form.id.trim(), name: form.name.trim(),
                   ...(form.nationalId.trim() && { nationalId: form.nationalId.trim() }),
                   ...(form.email.trim() && { email: form.email.trim() }),
                   ...(form.passport.trim() && { passport: form.passport.trim() }) }
-    const accepted = await onSubmit({ pii, bi: { iris: form.biometric.trim(), facePhoto: photo.dataUrl } })
+    const accepted = await onSubmit({ pii, bi: { featureTemplate: DEMO_BI_TEMPLATE, facePhoto: photo.dataUrl } })
     if (accepted) {
       setPhoto(undefined)
       if (photoInput.current) photoInput.current.value = ''
@@ -76,8 +77,8 @@ export function IdentityForm({ busy, disabled, testAdapter = false, onSubmit }: 
     {!disabled ? <form onSubmit={event => void submit(event)}>
       <div role="status" className="form-blocked-notice">
         {testAdapter
-          ? '本地 test-adapter 流程：只使用合成身份和测试照片。表单提交到本机 Portal/executor，由 executor 构造加密 CR 后提交 TP。'
-          : '身份材料仅会在提交时封装进加密申请。'}
+          ? '本地 test-adapter 流程：BI 使用固定占位模板，测试照片作为单独材料进入加密 CR；没有生物特征提取或比对。'
+          : '此表单仅用于演示：BI 为固定占位模板，不代表真实采集或身份核验。请勿提交真实生物特征数据。'}
       </div>
       <div className="identity-grid">
         <label>姓名 <input autoComplete="name" required disabled={disabled || busy} value={form.name} onChange={e => set('name', e.target.value)} /></label>
@@ -85,19 +86,18 @@ export function IdentityForm({ busy, disabled, testAdapter = false, onSubmit }: 
         <label>身份证号 <span className="optional">选填</span><input disabled={disabled || busy} value={form.nationalId} onChange={e => set('nationalId', e.target.value)} /></label>
         <label>Email <span className="optional">选填</span><input type="email" autoComplete="email" disabled={disabled || busy} value={form.email} onChange={e => set('email', e.target.value)} /></label>
         <label>Passport <span className="optional">选填</span><input disabled={disabled || busy} value={form.passport} onChange={e => set('passport', e.target.value)} /></label>
-        <label>生物特征摘要 BI <input required disabled={disabled || busy} value={form.biometric} onChange={e => set('biometric', e.target.value)} /></label>
       </div>
       <div className="form-footer">
         <div className="photo-upload">
-          <label htmlFor="photo">生物照片 <span className="optional">必填 · JPEG/PNG/WebP ≤ 64 KiB</span></label>
+          <label htmlFor="photo">测试照片 <span className="optional">必填 · JPEG/PNG/WebP ≤ 64 KiB</span></label>
           <input ref={photoInput} id="photo" type="file" accept="image/jpeg,image/png,image/webp" required
             disabled={disabled || busy} onChange={event => void selectPhoto(event)} />
-          <small>{photo?.name ?? '照片进入 G1 加密 CR；本地 test-adapter 审核详情可预览测试照片，其他部署默认不返回原文。'}</small>
+          <small>{photo?.name ?? '本地 test-adapter 审核详情可预览测试照片。'}</small>
           {photoError && <small className="photo-error" role="alert">{photoError}</small>}
           {photo && <img className="photo-preview" src={photo.dataUrl} alt="所选合成测试照片预览" />}
         </div>
         <button className="primary-button" type="submit"
-          disabled={disabled || busy || !form.name.trim() || !form.id.trim() || !form.biometric.trim() || !photo}>
+          disabled={disabled || busy || !form.name.trim() || !form.id.trim() || !photo}>
           {busy ? '提交中…' : '提交身份申请 · G1'}
         </button>
       </div>

@@ -32,7 +32,7 @@ _PRIMITIVE_MODULES = {
     "crypto.primitives.hashchain",
 }
 # 密码层内部实现：上层不得直接使用
-_INTERNAL_PREFIXES = ("crypto.phc", "crypto.derivation", "crypto.envelope", "crypto.tpaa_v1")
+_INTERNAL_PREFIXES = ("crypto.phc", "crypto.derivation", "crypto.envelope", "crypto.tpaa_v1", "crypto.memauth")
 # 允许的上层入口
 _ALLOWED_MODULES = {"crypto.hsm", "crypto.sdk"}
 # 受检的业务代码根

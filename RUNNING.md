@@ -1,5 +1,7 @@
 # A 轮启动与运行说明
 
+2026-11-11 平台 PA 集成增量：用户接受 FINAL 后现可继续 PUB → RUN，并在用户页调用由本申请 PHC/制品校验后构造的真实 AG2 实例。当前为固定测试模型，MemAuth 注册尚未接通；见 [平台 PA 关联说明](docs/memauth/platform-agent-link.md)。下文早期“仅到 FINAL / 不开放 PUB/RUN”的阶段描述已被此增量取代，其它本地演练与密钥边界仍适用。
+
 本文件记录 A 轮的真实启动边界与测试方式。请先读限制再启动，避免把测试 adapter 当成生产密钥托管。
 
 ## 运行边界
@@ -180,11 +182,14 @@ npm --prefix apps/user-web run dev
 
 ## 对账与幂等
 
+新签发 PHC 的 `ASO.APM.Modules` 保存有序能力模块清单，每项含 `moduleId`、`version`、`digest`（代码内容的 SHA-256 摘要），与 CMI 一并受 APproof 签名保护。这是表 1 基础上的显式扩展。G3 初始清单为空，D4 写入实际模块，D5 比对 PHC 与 PA 中的模块清单并重算 CMI，D6 保留 APM 并校验其模块摘要与 D4 声明一致。前端直接从 PHC 读取模块清单。历史凭证缺少该字段时仍按原有格式验签，不自动补写；请新建申请查看扩展后的完整凭证。
+
 - Portal `issue` 先持久记录 `issuing`，出错后记录 `issue_failed`；不自动重放非幂等 TP `/issue`。用户可 POST `/api/user/v1/applications/{id}/reconcile` 对账。
 - Executor 状态修改需要 requestId。同号同请求体返回首次结果；同号不同请求体返回 409。幂等记录持久化在 executor handler state 中。
 - Portal 只有 GET 401 会刷新域 token 并重试一次；非幂等 POST 不会因登录刷新而盲目重放。
 - AP D4 在同一原始 PACI 请求重试时重放已持久化的 PAR / recordId；同一会话更换 PACI 返回 409。Portal 本地 test-adapter 给 AP 请求 120 秒，覆盖昂贵的 D4 计算。
-- D1 的 AR 密文由 AP 会话保存；Portal 时间线只展示请求号和 CMM 版本，不回传 AR 密文。AP 的只读会话接口可用于受权排障。
+- Portal 时间线展示实际发送的 AR、PACI、PAR、DIDGR 密文及摘要。初始 PHC 由执行器验证 RR 后返回，最终 PHC 仅在用户侧验证 FINAL 后返回；明文视图不包含 H(ID)、随机开口或 s_ap。旧申请已保存的事件不会自动补录新增展示字段，可新建申请查看完整产物。
+- 模块选择在签署 PACI 前按 CMM 分类顺序排列，同一分类内按 CMM 版本选项顺序排列；AP 也按同一规则解析，重复模块版本被拒绝。CMI 仍对有序模块列表敏感，但不再受用户勾选先后影响。已签发凭证和已持久化 D4 响应不重新计算。
 - 旧版 AP 会话若已标记 built、但未保存 D4 响应，仅当原用户、申请、CMM、签名模块配置均匹配且旧记录未发布时，才会使用新 recordId 重新生成 D4，并在时间线标明旧 recordId；配置不匹配或状态不完整时明确返回冲突。不要手工删除 AP 状态或记录来绕过此保护。
 
 ## 验证

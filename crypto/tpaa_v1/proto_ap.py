@@ -165,7 +165,7 @@ def ap_build(*, ap_hsm, session: ApSession, paci_box: dict, cmm_version: str,
     cmi = hcgen(modules, session.hid)                                       # 式 8
 
     phc1, r_ap1 = algorithm1(from_jsonld(session.phc), ap_hsm=ap_hsm, r_ap=session.r_ap,
-                             cmi=cmi, time=now)                             # 算法1
+                             cmi=cmi, time=now, modules=modules)            # 算法1
     af2 = rebind_af(session.af, hsm=ap_hsm, hid=session.hid,
                     nonce=session.tpac["body"]["apNonce"], owner=session.owner,
                     kind="CMI", value=cmi)                                  # 算法1 第 11–13 行

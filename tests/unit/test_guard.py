@@ -125,6 +125,12 @@ def test_r2_blocks_tpaa_v1_internals() -> None:
     assert any(x.rule == "R2" for x in v)
 
 
+def test_r2_blocks_memauth_internals() -> None:
+    for source in ("import crypto.memauth.memory", "from crypto.memauth import vault"):
+        assert any(x.rule == "R2" for x in scan_text(source, "services/evil.py"))
+    assert scan_text("import crypto.sdk", "services/ok.py") == []
+
+
 def test_scan_dir_clean_on_current_project() -> None:
     """当前项目业务代码（services/ 等）不应有任何越权。"""
     v = scan_dir(ROOT)

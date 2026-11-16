@@ -26,8 +26,11 @@ const statusText: Record<string, string> = {
 export function TimelineStep({ event, applicationId, decryptedPreview, title, code, index,
   active, action, children, error }: Props) {
   const [expanded, setExpanded] = useState(false)
-  return <li className={`timeline-step ${event ? 'has-event' : ''} ${active ? 'is-active' : ''}`}>
-    <div className="step-marker" aria-hidden="true">{event && event.status !== 'pending' ? '✓' : String(index + 1).padStart(2, '0')}</div>
+  const failed = event?.status === 'failed' || event?.status === 'rejected'
+  const succeeded = event && ['approved', 'complete', 'accepted_by_tp', 'issued_to_user_executor',
+    'user_accepted', 'verified_by_user_executor', 'wallet_accepted', 'user_confirmed'].includes(event.status)
+  return <li className={`timeline-step ${event ? 'has-event' : ''} ${active ? 'is-active' : ''} ${failed ? 'is-failed' : ''}`}>
+    <div className="step-marker" aria-hidden="true">{failed ? '×' : succeeded ? '✓' : String(index + 1).padStart(2, '0')}</div>
     <div className="step-body">
       <div className="step-heading"><div><span className="step-code">{code}</span><h3>{title}</h3></div><span className={`status-pill ${event?.status ?? 'waiting'}`}>{event ? statusText[event.status] ?? event.status : '未开始'}</span></div>
       {event?.at && <time className="step-time">{event.at}</time>}

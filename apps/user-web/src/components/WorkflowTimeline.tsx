@@ -1,6 +1,7 @@
 import type { Selection, Timeline } from '../types'
 import { TimelineStep } from './TimelineStep'
 import { ModulePicker } from './ModulePicker'
+import { PlatformAgent } from './PlatformAgent'
 
 const STAGES = [
   ['INIT', '协议公共参数与参与方公钥'], ['G1', '用户提交身份申请（加密 CR）'],
@@ -11,6 +12,9 @@ const STAGES = [
   ['D5', '用户验证 PAR / CMI 并签署 DIDGR'],
   ['D6', 'TP 验证 DIDGR 并产生 DID / PHC″'],
   ['FINAL', '用户验证并接受最终 PHC'],
+  ['PUB', 'AP 验证接受回执并发布绑定制品'],
+  ['DELIVER', '用户执行器核验并接收本地智能体'],
+  ['RUN', '从本地颁发制品启动简易 AG2'],
 ] as const
 
 const ACTIONS: Record<string, { stage: string; label: string; endpoint: string }> = {
@@ -23,6 +27,9 @@ const ACTIONS: Record<string, { stage: string; label: string; endpoint: string }
   'finalize-d6': { stage: 'D6', label: '提交 DIDGR 并签发 FINAL', endpoint: 'finalize-d6' },
   'verify-final': { stage: 'FINAL', label: '在用户端验证 FINAL', endpoint: 'verify-final' },
   'accept-final': { stage: 'FINAL', label: '确认并接受最终 PHC', endpoint: 'accept-final' },
+  publish: { stage: 'PUB', label: '发布平台颁发的智能体制品', endpoint: 'publish' },
+  'deliver-agent': { stage: 'DELIVER', label: '接收并核验用户本地智能体', endpoint: 'deliver-agent' },
+  'start-runtime': { stage: 'RUN', label: '启动用户本地智能体', endpoint: 'start-runtime' },
   reconcile: { stage: 'G3', label: '对账签发状态', endpoint: 'reconcile' },
 }
 
@@ -41,13 +48,14 @@ export function WorkflowTimeline({ timeline, busy, selection, onSelection, onAct
   const eventArtifacts = (stage: string) =>
     timeline.events.find(item => item.stage === stage)?.artifacts ?? {}
   const g4 = eventArtifacts('G4')
+  const initial = g4.phc ? g4 : eventArtifacts('G3')
   const d5 = eventArtifacts('D5')
   const final = timeline.events.find(item => item.stage === 'FINAL'
     && item.status === 'verified_by_user_executor')?.artifacts ?? {}
   const d3 = eventArtifacts('D3')
   const previews: Record<string, Record<string, unknown> | undefined> = {
-    G3: g4.phc ? {
-      PHC: g4.phc,
+    G3: initial.phc ? {
+      PHC: initial.phc,
       TPACVerification: '用户端已验证签名、PHC 摘要及 G1 身份绑定',
       omitted: ['TPAC 中的随机开口值', 'H(ID)'],
       note: '来自用户端 G4 解密与验签后的结果。',
@@ -74,8 +82,8 @@ export function WorkflowTimeline({ timeline, busy, selection, onSelection, onAct
       domain2: d5.domain2,
       PHC: d5.phc,
       D4Statement: d5.d4Statement,
-      omitted: ['RF（随机秘密值）'],
-      note: '展示用户端构造 DIDGR 时确认的字段；随机秘密值不展示。',
+      omitted: ['RF（监管因子密文，包含在 DIDGR 密文中）'],
+      note: '展示用户端构造 DIDGR 时确认的字段；此视图不额外展开 RF。',
     } : undefined,
     D6: final.phc ? {
       DID: final.did,
@@ -104,6 +112,7 @@ export function WorkflowTimeline({ timeline, busy, selection, onSelection, onAct
         {code === 'FINAL' && timeline.nextAction === 'accept-final' && <p className="inline-hint">用户端已验证最终 PHC 的 TP/AP 签名、DID 绑定与 D4 配置一致性；确认后才接受 FINAL。</p>}
       </TimelineStep>
     })}</ol>
-    {timeline.state === 'd6_accepted' && <p className="inline-hint">协议流程已完成：用户已接受最终 PHC。Agent 制品发布和 Runtime 不属于本阶段范围。</p>}
+    {timeline.state === 'agent_constructed' && <p className="inline-hint">智能体已交付本地目录；实际对话需在用户本机配置模型 API。当前不代表 MemAuth 身份认证已通过。</p>}
+    {timeline.state === 'agent_constructed' && <PlatformAgent key={timeline.applicationId} applicationId={timeline.applicationId} />}
   </section>
 }
